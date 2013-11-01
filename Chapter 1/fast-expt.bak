@@ -1,0 +1,7 @@
+(define (fast-expt b n)
+  (define (square x) (* x x))
+  (cond ((= n 1) b)
+        ; even
+        ((= (modulo n 2) 0) (square (fast-expt b (/ n 2))))
+        ; odd
+        (else (* b (fast-expt b (- n 1))))))

@@ -1,0 +1,12 @@
+#lang planet neil/sicp
+
+(define (double one-arg-procedure)
+  (lambda (x) (one-arg-procedure (one-arg-procedure x))))
+
+(((double (double double)) inc) 5)
+
+; do inc 8 times. answer will be 5 + 8 = 13
+(((double (double double)) inc) 5)
+(((double (lambda (x) (double (double x)))) inc) 5)
+    
+  

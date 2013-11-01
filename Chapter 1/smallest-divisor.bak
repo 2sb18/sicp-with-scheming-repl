@@ -1,0 +1,4 @@
+#lang racket
+
+(define (smallest-divisor n)
+)

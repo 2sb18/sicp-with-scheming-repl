@@ -1,0 +1,18 @@
+; coins worth 1, 5, 10, 25, 50
+
+(define (!= a b) (not (= a b)))
+
+(define (count-change amount)
+  (define (cc amount denominations)
+    (cond ((= amount 0) 1)
+          ((> 0 amount) 0)
+          ((and (!= amount 0) (= denominations 0)))
+          (else (+ (cc
+  (define (biggest-denomination denominations)
+    (cond ((= denominations 5) 50)
+          ((= denominations 4) 25)
+          ((= denominations 3) 10)
+          ((= denominations 2) 5)
+          ((= denominations 1) 1)
+          (else 0)))
+  (cc amount 5))

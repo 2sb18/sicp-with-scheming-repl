@@ -1,0 +1,36 @@
+#lang racket
+
+(define (next test-divisor)
+  (if (= test-divisor 2) 3
+      (+ test-divisor 2)))
+
+(define (nexty test-divisor)
+  (+ test-divisor 1))
+
+(define (smallest-divisor funct n)
+  (define (find-divisor n test-divisor)
+    (cond ((> (* test-divisor test-divisor) n) n)
+     ((= (remainder n test-divisor) 0) test-divisor)
+        (else (find-divisor n (funct test-divisor)))))
+  (find-divisor n 2))
+
+(define (prime? funct n)
+  (= n (time (smallest-divisor funct n))))
+
+(define (search-for-primes funct start)
+  (if (prime? funct start) start
+      (search-for-primes funct (+ start 1))))
+
+(define (search-for-frimes funct start)
+  (if (fprime? funct start) start
+      (search-for-primes funct (+ start 1))))
+
+(search-for-primes next 1E14)   ; 2268     57%
+(search-for-primes next 1E15)   ; 6692     55%
+(search-for-primes nexty 1E14)  ; 3930
+(search-for-primes nexty 1E15)  ; 12175    4.91
+
+; only searching half the numbers gives almost a 2x gain. It's not quite 2x because
+; it takes a bit to check what number we're on and skip over the even numbers
+
+
