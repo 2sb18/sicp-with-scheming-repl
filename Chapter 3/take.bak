@@ -1,0 +1,11 @@
+#lang racket
+
+(define x (cons 1 2))
+(define y (cons 4 3))
+(define z (cons 1 4))
+
+(define lst '(x y z))
+
+(define 2nd (take lst 2))
+
+

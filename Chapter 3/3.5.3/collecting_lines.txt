@@ -1,0 +1,22 @@
+let t=[] | %s/\<case\s\+\(\w\+\):\zs/\=add(t,submatch(1))[1:0]/g
+
+let t=[] : create a new list
+|        : then do the next command
+%s       : whole file substitution
+/        : start of regex
+\<case\s\+   : search for 'case' with one or more spaces after 
+\(\w\+\) : \( and \) turns a pattern into an atom.
+         : \w\+ searches for one or more word characters 
+:        : have a : after the word
+\zs      : matches at any position and sets start of match there
+           this makes sure that none of the text is changed
+           this makes it a zero-width match
+/        : now we're in the 'substitute part'
+\=       : treat the 'substitute part' as an expression
+add      : add(list,expression) adds whatever the expression results in
+           to the list
+t,       : the list we created
+submatch(1) : returns the submatch,
+              ex for 'case steve:', it would return 'steve'
+[1:0]    : returns nothing, so there's not replacement
+

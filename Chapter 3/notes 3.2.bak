@@ -1,0 +1,19 @@
+(define f
+  (let ((zeroed? #f))
+    (lambda (x)
+      (cond (zeroed? 0)
+            ((eq? x 0) (set! zeroed? #t)
+                       0)
+            (else x)))))
+  
+(+ (f 1) (f 3) (f 0))
+
+(define (g x)
+  (let ((zeroed? #f))
+    (cond (zeroed? 0)
+            ((eq? x 0) (set! zeroed? #t)
+                       0)
+            (else x))))
+
+
+(+ (g 1) (g 0) (g 3))

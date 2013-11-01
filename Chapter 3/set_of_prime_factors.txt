@@ -1,0 +1,38 @@
+
+ all positive integers with the only prime factors being 2 3 or 5.
+ answer 2, 3, 5, 6, 8, 9
+
+ does a number only have one set of prime factors?
+ ex 100 = 10x10 = 5x2x5x2 = 2^2 x 5^2
+        = 20x5  = 4x5x5   = 2x2x5x5
+
+ can we prove by contradiction?
+ number x has two different sets of prime factors.
+ set one = pa1, pa2, pa3, ..., pan
+ set two = pb1, pb2, pb3, ..., pbm
+
+ x = pa1 * pa2 * pa3 * ... * pan = pb1 * pb2 * pb3 * ... * pbm
+ 
+we're going to divide x by pa1. that leaves us with an integer, (x/pa1)
+let's do the same thing with the 2nd set of primes.
+
+(pb1 * pb2 * pb3 * ... * pbm ) / pa1 = an integer whole number
+does this mean that one of the pb's is pa1? 
+
+; let's say that none of the pa1 is not in the set of pb's
+
+; then we have:   x      product of prime numbers from set B
+                 --- = ---------------------------------------    = whole number
+                 pa1                  pa1 
+
+
+    pb2 * pb3 * ... * pbm         whole number
+    ---------------------     =   ------------
+            pa1                      pb1
+
+(Katie's prime ideas)
+
+[10:16] Kato: If for a set of whole numbers, a,b,c,d, where d is the largest, the product abcd=p is only ALSO divisible by factors OR products, q, of a,b,c, or d when q < d.
+[10:17] Kato: if, somehow, I can prove that, then the following would be true for the prime number question:
+[10:21] Kato: For a set of prime numbers, a,b,c,d, where d is the largest, the product abcd=p is not divisible by any other prime numbers, q, if q < d.
+[10:21] Kato: (since a,b,c,d are prime themselves)

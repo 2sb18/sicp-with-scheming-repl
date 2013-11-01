@@ -1,0 +1,20 @@
+; 1.11
+; f(n) = n if n<3 and f(n) = f(n-1) + 2f(n-2) + 3f(n-3) if n>3
+; f(3) = f(2) + 2*f(1) + 3*f(0) = 2 + 2 = 4
+
+(define (fr n)
+  (if (< n 3)
+      n
+      (+ (fr (- n 1)) (* 2 (fr (- n 2))) (* 3 (fr (- n 3))))))
+
+(define (fi n)
+  (define (f-iter index n one-old two-old three-old)
+    (define current (+ one-old (* 2 two-old) (* 3 three-old)))
+    (if (>= index n)
+        current
+        (f-iter (+ index 1) n current one-old two-old)))
+  (if (< n 3)
+      n
+      (f-iter 3 n 2 1 0)))
+  
+  

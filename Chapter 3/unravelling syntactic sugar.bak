@@ -1,0 +1,12 @@
+(define (test-func)
+  (let ((a #f))
+    (define (b input)
+      (set! a input))
+    b))
+
+
+; get rid of the 'let' syntactic sugar
+
+(define test-func
+  (lambda ()
+    (

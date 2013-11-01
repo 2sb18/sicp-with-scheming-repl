@@ -1,0 +1,28 @@
+#lang planet neil/sicp
+
+; this program goes through each number from a to b and keeps a
+; running sum of the primes
+
+; takes up a constant in space. O(n) in time, well, actually
+; could be more depending on the prime? procedure
+
+(define (sum-primes a b)
+  (define (iter count accum)
+    (cond ((> count b) accum)
+          ((prime? count) (iter (+ count 1) (+ count accum)))
+          (else (iter (+ count 1) accum))))
+  (iter a 0))
+
+
+
+; this program creates a list from a to b, then filters it,
+; creating a list of all the primes from a to b, then
+; sums that list
+
+; takes up O(n) in space
+
+(define (sum-primes a b)
+  (accumulate +
+              0
+              (filter prime? (enumerate-interval a b))))
+

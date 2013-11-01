@@ -1,0 +1,219 @@
+#lang planet neil/sicp
+
+(define (square n)
+  (* n n))
+
+; print list, can be nested
+; makes all the spacing correct!
+(define (pl n)
+  (define (in-loop n space?)
+    (cond ((null? n) 0)
+          ((not (pair? n)) (if space? (display " ")) (display n))
+          ((list? (car n)) (out-loop (car n) #t) (in-loop (cdr n) #t))
+          (else (if space? (display " ")) (display (car n)) (in-loop (cdr n) #t)))) 
+  (define (out-loop n space?)
+    (cond ((list? n) (if space? (display " ")) (display "(") (in-loop n #f) (display ")"))
+          (else (in-loop n #f))))
+  (out-loop n #f) (display "\n"))
+
+(define (make-table)
+  (let ((local-table (list '*table*)))
+    (define (lookup key-1 key-2)
+      (let ((subtable (assoc key-1 (cdr local-table))))
+        (if subtable
+            (let ((record (assoc key-2 (cdr subtable))))
+              (if record
+                  (cdr record)
+                  false))
+            false)))
+    (define (insert! key-1 key-2 value)
+      (let ((subtable (assoc key-1 (cdr local-table))))
+        (if subtable
+            (let ((record (assoc key-2 (cdr subtable))))
+              (if record
+                  (set-cdr! record value)
+                  (set-cdr! subtable
+                            (cons (cons key-2 value)
+                                  (cdr subtable)))))
+            (set-cdr! local-table
+                      (cons (list key-1
+                                  (cons key-2 value))
+                            (cdr local-table)))))
+      'ok)    
+    (define (dispatch m)
+      (cond ((eq? m 'lookup-proc) lookup)
+            ((eq? m 'insert-proc!) insert!)
+            (else (error "Unknown operation -- TABLE" m))))
+    dispatch))
+
+(define operation-table (make-table))
+(define get (operation-table 'lookup-proc))
+(define put (operation-table 'insert-proc!))
+
+(define (attach-tag type-tag contents)
+  (cons type-tag contents))
+(define (type-tag datum)
+  (if (pair? datum)
+      (car datum)
+      (error "Bad tagged datum -- TYPE-TAG" datum)))
+(define (contents datum)
+  (if (pair? datum)
+      (cdr datum)
+      (error "Bad tagged datum -- CONTENTS" datum)))
+
+
+(define (install-sum-package)
+  ;; internal procedures
+  (define (derive-sum sum var) ; ex. sum = '(3 x)
+    (make-sum (deriv (car sum) var)
+                   (deriv (cadr sum) var)))
+  ;; interface to the rest of the system
+  (define (tag x) (attach-tag '+ x))
+  (define (make-sum a1 a2)
+    (cond ((eq? 0 a1) a2)
+          ((eq? 0 a2) a1)
+          ((eq? a1 a2) (make-product 2 a1))
+          (else (tag (list a1 a2)))))
+  (put 'make-sum '+ make-sum)
+  (put 'deriv '+ derive-sum)
+  'done)
+(install-sum-package)
+(define (make-sum a1 a2)
+  ((get 'make-sum '+) a1 a2))
+
+(define (install-difference-package)
+  ;; internal procedures
+  (define (derive-difference difference var) ; ex. sum = '(3 x)
+    (make-difference (deriv (car difference) var)
+                   (deriv (cadr difference) var)))
+  ;; interface to the rest of the system
+  (define (tag x) (attach-tag '- x))
+  (define (make-difference a1 a2)
+    (cond ((eq? 0 a2) a1)
+          ((eq? a1 a2) 0)
+          (else (tag (list a1 a2)))))
+  (put 'make-difference '+ make-difference)
+  (put 'deriv '+ derive-difference)
+  'done)
+(install-difference-package)
+(define (make-difference a1 a2)
+  ((get 'make-difference '-) a1 a2))
+
+(define (install-product-package)
+  ;; internal procedures
+  (define (derive-product product var)
+    (make-sum (make-product (car product) (deriv (cadr product) var))
+              (make-product (cadr product) (deriv (car product) var))))
+  ;; interface to the rest of the system
+  (define (make-product a1 a2)
+    (cond ((or (eq? 0 a1) (eq? 0 a2)) 0) 
+          ((eq? 1 a1) a2)
+          ((eq? 1 a2) a1)
+          (else (list '* a1 a2))))
+  (put 'make-product '* make-product)
+  (put 'deriv '* derive-product)
+  'done)
+(install-product-package)
+(define (make-product a1 a2)
+  ((get 'make-product '*) a1 a2))
+
+(define (install-log-package)
+  ;; internal procedures
+  (define (derive-log log var)
+    (make-quotient (deriv (cadr log) var) (make-product (cadr log) (make-log 'e (car log)))))
+  ;; interface to the rest of the system
+  (define (make-log b n)
+    (cond ((eq? 0 n) (error "taking log of 0"))
+          ((eq? 1 n) 0)
+          ((eq? b n) 1)
+          (else (list 'log b n))))
+  (put 'make-log 'log make-log)
+  (put 'deriv 'log derive-log)
+  'done)
+(install-log-package)
+(define (make-log b n)
+  ((get 'make-log 'log) b n))
+
+(define (install-quotient-package)
+  ;; internal procedures
+  (define (num quotient)
+    (car quotient))
+  (define (denom quotient)
+    (cadr quotient))
+  (define (derive-quotient quotient var)
+    (make-quotient (make-difference (make-product (denom quotient) (deriv (num quotient var)))
+                                    (make-product (num quotient) (deriv (denom quotient var))))
+                   (make-exponentiation (denom quotient) 2)))
+  ;; interface to the rest of the system
+  (define (make-quotient num denom)
+    (cond ((eq? 0 denom) (error "divide by zero -- QUOTIENT PACKAGE MAKE-QUOTIENT"))
+          ((eq? 1 denom) num)
+          (else (list '/ num denom))))
+  (put 'make-quotient '/ make-quotient)
+  (put 'deriv '/ derive-quotient)
+  'done)
+(install-quotient-package)
+(define (make-quotient num denom)
+  ((get 'make-quotient '/) num denom))
+
+(define (install-exponentiation-package)
+  ;; internal procedures
+  (define (base exp)
+    (car exp))
+  (define (exponent exp)
+    (cadr exp))
+  (define (derive-exponentiation exp var)
+    (make-product (make-exponentiation (base exp) (exponent exp))
+                  (make-sum
+                   (make-product (make-log 'e (base exp)) (deriv (exponent exp) var))
+                   (make-product (make-quotient (exponent exp) (base exp))
+                                 (deriv (base exp) var)))))
+  ;; interface to the rest of the system
+  (define (make-exponentiation b e)
+    (cond ((and (eq? 0 b) (eq? 0 e)) (error "cannot have (** 0 0)"))
+          ((eq? e 0) 1)
+          ((eq? e 1) b)
+          (else (list '** b e))))
+  (put 'make-exponentiation '** make-exponentiation)
+  (put 'deriv '** derive-exponentiation)
+  'done)
+(install-exponentiation-package)
+(define (make-exponentiation b e)
+  ((get 'make-exponentiation '**) b e))
+
+
+
+; deriv takes an expression exp and a variable var. It returns 0
+; if the exp is just a number, 1 if the exp is the variable being
+; used for the differentiation, and 0 if its a different variable.
+; if the exp is neither a variable or a number, use use the dispatch
+; system to find the correct operation
+
+; (get 'deriv (operator exp)) takes the operator of the exp (which is
+; also called the type of the exp, for example ** or +, then finds the
+; 'deriv procedure for that type and returns it.
+
+; numbers and variables don't have type-tags, so we can't use the dispatch
+; system for them.
+(define (deriv exp var)
+   (cond ((number? exp) 0)
+         ((symbol? exp) (if (eq? exp var) 1 0))
+         (else ((get 'deriv (operator exp)) (operands exp)
+                                            var))))
+
+; for d. If we changed the dispatch line in deriv to
+; ((get (operator exp) 'deriv)
+; this would go to something like (get '+ 'deriv)
+; in this case we'd have to switch how we put stuff
+; to the table. So we'd put stuff with (put '+ 'deriv derive)
+
+(define (operator exp) (car exp))
+(define (operands exp) (cdr exp))
+
+(pl (make-sum 'x 'y))
+(pl (deriv '(+ x (+ y 2)) 'x))
+(pl (deriv 0 'x))
+(pl (deriv '(log e x) 'x))
+(pl (deriv '(** e x) 'x))
+(pl (deriv '(** e (* x (log e x))) 'x)) ; good!
+

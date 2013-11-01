@@ -1,0 +1,9 @@
+#lang planet neil/sicp
+
+; deriv system with message passing
+
+(define (make-sum exp1 exp2)
+  (define (dispatch op . arg)
+    (cond ((eq? op 'deriv) (make-sum (deriv exp1 (car arg)) (deriv exp2 (car arg))))
+          ((eq? op 'display) (list '+ (display exp1) (display exp2)))))
+  dispatch)

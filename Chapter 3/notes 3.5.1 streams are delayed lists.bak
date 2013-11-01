@@ -1,0 +1,23 @@
+
+; this program goes through each number from a to b and keeps a
+; running sum of the primes
+
+; takes up a constant in space. O(n) in time, well, actually
+; could be more depending on the prime? procedure
+
+(define (sum-primes a b)
+  (define (iter count accum)
+    (cond ((> count b) accum)
+          ((prime? count) (iter (+ count 1) (+ count accum)))
+          (else (iter (+ count 1) accum))))
+  (iter a 0))
+
+
+
+
+
+(define (sum-primes a b)
+  (accumulate +
+              0
+              (filter prime? (enumerate-interval a b))))
+

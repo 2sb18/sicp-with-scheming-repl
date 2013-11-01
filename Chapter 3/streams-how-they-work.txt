@@ -1,0 +1,29 @@
+
+; why is this so awesome?
+; because: stream-enumerate-interval doesn't create a list from
+; 10000 to one 1 million. It creates a stream, which is a cons
+; of 10000 and the promise to create more of the stream if
+; necessary.
+
+what are the steps involved in doing the stream thing?
+
+(stream-car
+  (stream-cdr
+    (stream-filter prime?
+                   (stream-enumerate-interval 10000 1000000))))
+
+1. stream-enumerate-interval creates a stream, which looks like this:
+   (cons 10000 (delay (stream-enumerate-interval 10001 1000000)))
+2. stream-filter takes in the stream, looks to see if the first element
+   10000 is prime?. It's not, so it moves to the else, in which case 
+   it has to get the stream-cdr of the stream.
+3. so the cdr of the stream is the:
+   (delay (stream-enumerate-interval 10001 1000000))
+4. stream-cdr puts a force around that, so that turns into:
+   (cons 10001 (delay (stream-enumerate-interval 10002 1000000)))
+5. we keep doing steps 2 to 4 till we come to have the stream:
+   (cons 10007 (delay (stream-enumerate-interval 10008 1000000)))
+6. (prime? 10007) is #t so filter returns:
+   (cons 10007 (delay (stream-filter prime? (force (delay (stream-enumerate-interval 10008 1000000))))))
+   = (cons 10007 (delay (stream-filter prime? (stream-enumerate-interval 10008 1000000))))
+   = (cons 10007 (delay (stream-filter prime? (cons 10008 (delay stream-enumerate-interval 10009 1000000)))))

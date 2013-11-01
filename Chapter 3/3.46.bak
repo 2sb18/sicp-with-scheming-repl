@@ -1,0 +1,72 @@
+
+; try doing this in C. It's painful!
+(define (make-serializer)
+  (let ((mutex (make-mutex)))
+    (lambda (p)
+      (define (serialized-p . args)
+        (mutex 'acquire)
+        (let ((val (apply p args)))
+          (mutex 'release)
+          val))
+      serialized-p)))
+
+
+; the mutex has a procedure called acquire and a procedure called release
+
+; (make-serializer) creates an "object" and returns a procedure which we'll
+; call the serializer (it is called by anything since it's an anonymous procedure)
+
+; the serializer (a procedure) that is created looks like this:
+
+(lambda (p)
+      (define (serialized-p . args)
+        (mutex 'acquire)
+        (let ((val (apply p args)))
+          (mutex 'release)
+          val))
+      serialized-p)
+
+; where mutex is a local mutex object that belongs to the serializer.
+
+; so serializer takes a procedure, then creates a new procedure which it returns.
+; this new procedure takes in any number of arguments, then it aquires the serializers
+; mutex, then runs the original procedure, releases the mutex, and returns the original
+; procedure's return value.
+
+
+(define (make-mutex)
+  (let ((cell (list false)))      ; each mutex has a cell           
+    (define (the-mutex m)
+      (cond ((eq? m 'acquire)
+             (if (test-and-set! cell)  ; test-and-set! sees if cell is false, if so
+                                       ; set it to true. now mutex is acquired
+                                       ; if cell is already true, keep running a loop
+                                       ; trying to acquire the mutex.
+                                       
+                 (the-mutex 'acquire))) ; retry
+            ((eq? m 'release) (clear! cell))))
+    the-mutex))
+(define (clear! cell)
+  (set-car! cell false))
+
+; crappy thing about this mutex, is that there's no queue for the procedures trying
+; to acquire the mutex. All the procedures are just shouting "pick me pick me!!!!"
+; a procedure could conceivably wait forever to acquire.
+
+(define (test-and-set! cell)
+  (if (car cell)
+      true
+      (begin (set-car! cell true)
+             false)))
+
+; test-and-set! does the following:
+; 1. accesses cell and gets the car of it
+; 2. looks at that value, if it's true, return true
+; if it's false 3. set car of cell to true
+;               4. return false
+
+; problem with this is that test-and-set! is not atomic.
+; let's say two procedures are trying to acquire the mutex. they both call
+; test-and-set! at the same time. they could both see that cell is false, then both
+; set to true, and both procedures would run at the same time. No good!
+

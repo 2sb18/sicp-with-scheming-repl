@@ -1,0 +1,16 @@
+(define (make-wire constant-value)
+  (lambda (op)
+    (cond ((eq? op 'set-value) (lambda (value) (set! constant-value value)))
+          ((eq? op 'get-value) (lambda () constant-value))
+          (else (error "no operation by that name" op)))))
+
+
+
+
+
+
+(define y (make-wire '()))
+(define x (make-wire 5))
+(define c (make-wire))
+(define a (make-wire 2))
+(define b (make-wire '()))

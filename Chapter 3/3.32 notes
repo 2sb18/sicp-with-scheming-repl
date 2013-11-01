@@ -1,0 +1,115 @@
+(define (make-wire) ... )
+- returns an object that holds two variables: one is the signal-value
+  of the wire, the other is a list of procedures that need to be
+  undertaken when the wire changes values. these procedures could change
+  other wires, which would potentially having a cascading effect of
+  changes.
+- make-wire has procedures for getting the signal-value, for setting the
+  signal value, and for adding an action to it.
+
+agenda
+- agenda is a cons. first part is the current-time, second part is a list
+  of segments.
+- the agenda is empty if the list of segments is empty
+
+
+(define (add-to-agenda! time action agenda) ... )
+- this procedure is only called by procedure (afer-delay delay action)
+- how is after-delay called?
+- the or-gate calls it like (after-delay or-gate-delay (lambda ()
+                                                         (set-signal! output new-value))
+- so delay is a number, and action is a procedure to call.
+- let's look at the add-to-agenda! procedure itself
+- first we get the segments of the agenda, which are is a list of segments
+- we come to (belongs-before? segments), segments being the segments of the
+  agenda. 
+- a segment consists of a time and a queue. 
+- we're trying to add an action to the agenda at some time
+- belongs-before? says true if there are no segments, or if the time
+  of the action we're trying to put in is less than the time of the first
+  segment. This likely means that the segments are ordered by time.
+
+
+
+simple example
+
+(define the-agenda (make-agenda))
+- create empty agenda
+
+(define inverter-delay 2)
+- set the delay of the inverter to 2
+
+(define in (make-wire))
+(define out (make-wire))
+- create two wires, both with signal-values of 0, and no actions
+(probe 'in in)
+(probe 'out out)
+- put probes on the two wires. probes are simple add-action!s. When 
+  the wire changes states, these procedures are called, which output
+  information, like current-time and the new signal value to the console.
+- but the add-action! procedure, when called, also runs the procedure
+  sent to it. That's why (probe 'in in) sends information to the console
+  when executed.
+(inverter in out)
+- this is just an add-action!. We're adding an action to the input wire.
+  But the action procedure we're adding is interesting. 
+- it's (add-action! input invert-input).
+  - input is the wire. invert-input is a procedure.
+- so (add-action! input invert-input) adds invert-input to the input
+  wire. Then it runs the invert-input procedure.
+  - invert-input is run
+  - get-signal of "in". it's 0, so new-value is out. then we have this
+    weird (after-delay inverter-delay (lambda () (set-signal! output new-value))
+    - after-delay is just syntactic sugar for add-to-agenda!
+    - so we got (add-to-agenda! (+ delay (current-time the-agenda))
+                                action the-agenda
+    - where the action is that set-signal! thing above
+    - the delay part is a little confusing.
+    - let's look at the-agenda and the add-to-agenda! procedure, going to
+      write what I find above
+
+
+here's another description now that I understand things a bit better
+- wires have a list of action-procedures that happen when the wire changes
+  value.
+- when you add a device, the part generally adds an action to the wires connected to it. That's the point of parts, to change the signals of wires.
+  - so when you add an action to a wire, you include an action procedure.
+    when the wire changes values and the action is carried out, the action
+    can include an after-delay function, that adds a lambda to the agenda
+    to be carried out after some amount of delay.
+- why does the add-action! procedure not only add the action to the wire's
+  list of action-procedures, but also invoke the action right away?
+  - well, let's say we have a wire 'a' and 'b' both at zero, and then hook
+    an inverter up between them at time zero. well, after the inverter-delay
+    'b' should go to 1. without that initial calling of the action function,
+    we'd never know to switch up 'b' until 'a' was explicitly changed.
+
+Exercise 3.32: The procedures to be run during each time segment of the agenda are kept in a queue. Thus, the procedures for each segment are called in the order in which they were added to the agenda (first in, first out). Explain why this order must be used. In particular, trace the behavior of an and-gate whose inputs change from 0,1 to 1,0 in the same segment and say how the behavior would differ if we stored a segment's procedures in an ordinary list, adding and removing procedures only at the front (last in, first out).
+
+- let's trace this and-gate
+- we have wire in1 set to 0 and wire in2 set to 1, out set to zero.
+- let's assume and-delay is 1, time is 0.
+- we hook up the and device. it first runs (add-action! in1 and-action-proc)
+  - this puts the and-action-proc in in1's list, and also calls the proc
+    - new-value is 0. now we call (after-delay 1 (lambda () (set-signal!
+                                                              out 0)))
+      - this adds an item to the agenda. so now in the agenda we have:
+        at time 1, (set-signal! out 0)
+  - now it's going to run (add-action! in2 and-action-proc)
+  - and-action-proc is now in in2's list, and proc is called.
+    - new-value is 0. item added to agenda. now agenda is:
+      at time 1, (set-signal! out 0), (set-signal! out 0)
+    - doesn't seem like we have any problems yet.
+- we call (set-signal! in1 1)
+  - it will call the action-procedure and-action-procedure.
+    - new-value is 1. now time 1, (out 1), (out 0), (out 0)
+- we call (set-signal! in2 0)
+  now agenda is: time 1, (out 0), (out 1), (out 0), (out 0)
+
+- now we (propagate), we get to time 1
+  - first item is (out 0). out is already 0, so nothing happens. item taken
+    off list: time 1, (out 1), (out 0), (out 0)
+  - next: (out 1). out set to 1.
+  - then out set to 0, and 0 again.
+- not really sure where the problem is.
+

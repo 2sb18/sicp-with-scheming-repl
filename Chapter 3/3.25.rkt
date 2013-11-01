@@ -1,0 +1,48 @@
+(define (make-table)
+  (let ((table (list '*table*)))
+    ; returns the record of the corresponding key
+    ; if nothing is found, returns false
+    (define (assoc key list-of-records)
+      (cond ((null? list-of-records) #f)
+            ((equal? key (caar list-of-records)) (car list-of-records))
+            (else (assoc key (cdr list-of-records)))))
+    (define (lookup list-of-keys list-of-records)
+      (let ((subrecord (assoc (car list-of-keys) list-of-records)))
+        (if subrecord
+            (if (= 1 (length list-of-keys))
+                (cadr subrecord)
+                (lookup (cdr list-of-keys) (cddr subrecord)))
+            #f)))  
+    (define (insert! list-of-keys value backbone)
+      (let ((subrecord (assoc (car list-of-keys) (cdr backbone))))
+        (if subrecord
+            (if (= 1 (length list-of-keys))
+                (set-car! (cdr subrecord) value)
+                (insert! (cdr list-of-keys) value (cdr subrecord)))
+            (if (= 1 (length list-of-keys))
+                (let ((new-record (list (car list-of-keys) value)))
+                  (set-cdr! backbone (cons new-record (cdr backbone))))
+                (let ((new-record (list (car list-of-keys) #f)))
+                  (set-cdr! backbone (cons new-record (cdr backbone)))
+                  (insert! (cdr list-of-keys) value (cdr new-record)))))))
+    (lambda (proc)
+      (cond ((eq? proc 'lookup) (lambda (list-of-keys) 
+                                  (lookup list-of-keys (cdr table))))
+            ((eq? proc 'insert!) (lambda (list-of-keys value)
+                                   (insert! list-of-keys value table)))
+            (else (error "procedure does not exist for table" proc table))))))
+
+(define table1 (make-table))
+((table1 'insert!) (list 'a) 10)
+((table1 'insert!) (list 'a 'b) 3)
+((table1 'insert!) (list 'c 'd) 6)
+((table1 'insert!) (list 'a 'b) 7)
+((table1 'insert!) (list 'c 'd) 6)
+((table1 'lookup) (list 'a 'b))
+((table1 'lookup) (list 'c 'd))
+((table1 'lookup) (list 'b 'a))
+((table1 'insert!) (list 'm 'e 'o 'w) 22)
+((table1 'lookup) (list 'm 'e 'o 'w))
+
+
+

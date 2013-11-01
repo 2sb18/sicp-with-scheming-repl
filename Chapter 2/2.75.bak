@@ -1,0 +1,10 @@
+; in data-directed programming, the type of the data is sent along with the data.
+
+; ie '(rectangular 3 4) or '(polar 3 4)
+
+; a package is installed for each type, which has procedures on how to deal with that type.
+
+; this means that each operation has to take care of its own dispatching, such as
+
+(define (deriv exp var)
+  ((get 'deriv (operator exp)) (operands exp) var))
