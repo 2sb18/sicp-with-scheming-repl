@@ -5,15 +5,15 @@
 ; executed it
 (define (eval exp env)
   (cond ((self-evaluating? exp) exp)
-        ((variable? exp) (lookup-variable-value exp env))
+        ; ((variable? exp) (lookup-variable-value exp env))
         ((quoted? exp) (text-of-quotation exp))
         ((assignment? exp) (eval-assignment exp env))
         ((definition? exp) (eval-definition exp env))
         ((if? exp) (eval-if exp env))
-        ((lambda? exp)
-         (make-procedure (lambda-parameters exp)
-                         (lambda-body exp)
-                         env))
+        ; ((lambda? exp)
+        ;  (make-procedure (lambda-parameters exp)
+        ;                  (lambda-body exp)
+        ;                  env))
         ; begin is used to package a sequence of expressions into
         ; a single expression
         ((begin? exp)
@@ -21,26 +21,26 @@
         ; turn cond expression into an if expression then evaluate again
         ((cond? exp) (eval (cond->if exp) env))
         ; this is the last thing, so maybe the operator is a procedural call
-        ((application? exp)
-         (apply (eval (operator exp) env)
-                (list-of-values (operands exp) env)))
+        ; ((application? exp)
+        ;  (apply (eval (operator exp) env)
+        ;         (list-of-values (operands exp) env)))
         (else
           (error "Unknown expression type -- EVAL" exp))))
 
 ; arguments is a list of arguments
-(define (apply procedure arguments)
-  (cond ((primitive-procedure? procedure)
-         (apply-primitive-procedure procedure arguments))
-        ((compound-procedure? procedure)
-         (eval-sequence
-           (procedure-body procedure)
-           (extend-environment
-             (procedure-parameters procedure)
-             arguments
-             (procedure-environment procedure))))
-        (else
-          (error
-            "Unknown procedure type -- APPLY" procedure))))
+; (define (apply procedure arguments)
+;   (cond ((primitive-procedure? procedure)
+;          (apply-primitive-procedure procedure arguments))
+;         ((compound-procedure? procedure)
+;          (eval-sequence
+;            (procedure-body procedure)
+;            (extend-environment
+;              (procedure-parameters procedure)
+;              arguments
+;              (procedure-environment procedure))))
+;         (else
+;           (error
+;             "Unknown procedure type -- APPLY" procedure))))
 
 ; I think exps is a list of the operands
 ; so this turns a list of operands into a list of values
@@ -189,7 +189,14 @@
         (if (null? rest)
           (sequence->exp (cond-actions first))
           (error "ELSE clause isn't last -- COND->IF" clauses))
-        (make-if (cond-predicate first)
-                 (sequence->exp (cond-actions first))
-                 (expand-clauses rest))))))
+        ; is the (<test> => <recipient>) syntax is being used?
+        (if (and (= 3 (length first)) (eq? '=> (list-ref first 1)))
+          ; kinda ugly but we're doing the evaluation right here
+          (let ((predicate (eval (car first))))
+            (if (true? predicate)
+              ((caddr first) predicate)
+              (expand-clauses rest)))
+          (make-if (cond-predicate first)
+                   (sequence->exp (cond-actions first))
+                   (expand-clauses rest)))))))
 

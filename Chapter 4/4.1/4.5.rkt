@@ -1,30 +1,12 @@
-(put 'cond (lambda (exp env) (eval (cond->if exp) env)))
 
+;Exercise 4.5.  Scheme allows an additional syntax for cond clauses, (<test> => <recipient>). If <test> evaluates to a true value, then <recipient> is evaluated. Its value must be a procedure of one argument; this procedure is then invoked on the value of the <test>, and the result is returned as the value of the cond expression. For example
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; SPECIFICATION OF THE SYNTAX 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;(cond ((assoc 'b '((a 1) (b 2))) => cadr)
+;      (else false))
 
+;returns 2. Modify the handling of cond so that it supports this extended syntax. 
 
-; is exp of the form (tag a b c d ...)
-(define (tagged-list? exp tag)
-  (if (pair? exp)
-    (eq? (car exp) tag)
-    false))
-
-(define (cond? exp) (tagged-list? exp 'cond))
-(define (cond-clauses exp) (cdr exp))
-(define (cond-else-clause? clause)
-  (eq? (cond-predicate clause) 'else))
-(define (cond-predicate clause) (car clause))
-(define (cond-actions clause) (cdr clause))
-
-; takes in an expression like:
-; (cond (a b)
-;       (c d)
-;       (else e))
-(define (cond->if exp)
-  (expand-clauses (cond-clauses exp)))
+; MY ANSWER, had to modify the expand-clauses function
 
 ; clauses would look like:
 ; (a b) (c d) (else e)
@@ -38,7 +20,13 @@
         (if (null? rest)
           (sequence->exp (cond-actions first))
           (error "ELSE clause isn't last -- COND->IF" clauses))
-        (make-if (cond-predicate first)
-                 (sequence->exp (cond-actions first))
-                 (expand-clauses rest))))))
-
+        ; is the (<test> => <recipient>) syntax is being used?
+        (if (and (= 3 (length first)) (eq? '=> (list-ref first 1)))
+          ; kinda ugly but we're doing the evaluation right here
+          (let ((predicate (eval (car first))))
+            (if (true? predicate)
+              ((caddr first) predicate)
+              (expand-clauses rest)))
+          (make-if (cond-predicate first)
+                   (sequence->exp (cond-actions first))
+                   (expand-clauses rest)))))))
