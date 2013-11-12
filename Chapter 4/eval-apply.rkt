@@ -9,6 +9,7 @@
         ((quoted? exp) (text-of-quotation exp))
         ((assignment? exp) (eval-assignment exp env))
         ((definition? exp) (eval-definition exp env))
+        ((let? exp) (eval (let->combination exp env)))
         ((if? exp) (eval-if exp env))
         ; ((lambda? exp)
         ;  (make-procedure (lambda-parameters exp)
@@ -21,7 +22,11 @@
         ; turn cond expression into an if expression then evaluate again
         ((cond? exp) (eval (cond->if exp) env))
         ; this is the last thing, so maybe the operator is a procedural call
+        ; an application is just (function a b ..) where a and b are arguments
+        ; so what if this was send (meow (if a b c) d)?
+
         ; ((application? exp)
+        ;   the (operator exp) just takes the first element of the expression
         ;  (apply (eval (operator exp) env)
         ;         (list-of-values (operands exp) env)))
         (else
@@ -46,6 +51,8 @@
 ; so this turns a list of operands into a list of values
 
 ; left-to-right evaluator
+; this evaluates all the expressions in the list
+; exps is just the operands, so no-operands just checks to see if exps is null 
 (define (list-of-values exps env)
   (if (no-operands? exps)
     '()
@@ -80,6 +87,28 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; SPECIFICATION OF THE SYNTAX 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (let? exp) (tagged-list? exp 'let))
+
+(define (let->combination exp env)
+  (cons (make-lambda (get-vars-of-var-expression-list (cadr exp))
+               (caddr exp))
+        (get-exprs-of-var-expression-list var-expression-list)))
+
+(define (get-vars-of-var-expression-list var-expression-list)
+  (if (null? var-expression-list)
+    '()
+    (cons (caar var-expression-list )
+          (get-vars-of-var-expression-list (cdr var-expression-list)))))
+
+(define (get-exprs-of-var-expression-list var-expression-list)
+  (if (null? var-expression-list)
+    '()
+    ; !!! with cadar i'm assuming that every var expression pair is actually a list
+    ; so that first you have to get the first element, which is a list for the first
+    ; pair, then you gotta do a cdr, then take the car of that.
+    (cons (cadar var-expression-list )
+          (get-exprs-of-var-expression-list (cdr var-expression-list)))))
 
 ; only numbers and strings are self-evaluating
 (define (self-evaluating? exp)
