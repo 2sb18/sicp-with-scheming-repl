@@ -1,4 +1,6 @@
 
+
+
 #lang planet neil/sicp 
 
 ; the eval procedure takes an expression and the environment that it's to be
@@ -103,10 +105,20 @@
           (get-exprs-of-var-expression-list (cdr var-expression-list)))))
 
 ; the exp in this case is a cons-chain, let.var-exp-list.body
+; special form of let is let.var.var-exp-list.body where body is binded
+; to var, so that it can call itself
 (define (let->combination exp)
-  (cons (make-lambda (get-vars-of-var-expression-list (cadr exp))
-               (cddr exp))
-        (get-exprs-of-var-expression-list var-expression-list)))
+  ; if there's only three elements in the let, it's normal form
+  (if (not (pair? (cddr exp)))
+    (cons (make-lambda (get-vars-of-var-expression-list (cadr exp))
+                       (cddr exp))
+          (get-exprs-of-var-expression-list var-expression-list))
+    ; we got the crazy special let form )
+    (make-begin (list 
+                  (cons 'define
+                        (cons (cons (cadr exp) (get-vars-of-var-expression-list (caddr)))
+                              (cdddr exp)))
+                  (cons (cadr exp) (get-exprs-of-var-expression-list (caddr)))))))
 
 ; the exp in this case is a cons-chain, let*.var-exp-list.body
 (define (let*? exp) (tagged-list? exp 'let*))
@@ -117,7 +129,6 @@
     (cons 'let (cdr exp))
     (cons 'let (list (cadr exp))
           (cons 'let* (cons (cdadr exp) (cddr exp))))))
-
 
 ; only numbers and strings are self-evaluating
 (define (self-evaluating? exp)
@@ -155,7 +166,7 @@
 (define (definition-value exp)
   (if (symbol? (cadr exp))
     (caddr exp)
-    (make-lambda (cdadr exp)    ; formal parametersi
+    (make-lambda (cdadr exp)    ; formal parameters
                  (cddr exp))))  ; body
 
 (define (lambda? exp) (tagged-list? exp 'lambda))
