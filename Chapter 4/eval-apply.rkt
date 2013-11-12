@@ -10,6 +10,7 @@
         ((assignment? exp) (eval-assignment exp env))
         ((definition? exp) (eval-definition exp env))
         ((let? exp) (eval (let->combination exp) env))
+        ((let*? exp) (eval (let*->nested-lets exp) env))
         ((if? exp) (eval-if exp env))
         ; ((lambda? exp)
         ;  (make-procedure (lambda-parameters exp)
@@ -89,26 +90,34 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (let? exp) (tagged-list? exp 'let))
-
-(define (let->combination exp)
-  (cons (make-lambda (get-vars-of-var-expression-list (cadr exp))
-               (caddr exp))
-        (get-exprs-of-var-expression-list var-expression-list)))
-
 (define (get-vars-of-var-expression-list var-expression-list)
   (if (null? var-expression-list)
     '()
     (cons (caar var-expression-list )
           (get-vars-of-var-expression-list (cdr var-expression-list)))))
-
 (define (get-exprs-of-var-expression-list var-expression-list)
   (if (null? var-expression-list)
     '()
-    ; !!! with cadar i'm assuming that every var expression pair is actually a list
-    ; so that first you have to get the first element, which is a list for the first
-    ; pair, then you gotta do a cdr, then take the car of that.
-    (cons (cadar var-expression-list )
+    ; !!! pretty sure var-expression pair is just a cons, not a list
+    (cons (cdar var-expression-list )
           (get-exprs-of-var-expression-list (cdr var-expression-list)))))
+
+; the exp in this case is a cons-chain, let.var-exp-list.body
+(define (let->combination exp)
+  (cons (make-lambda (get-vars-of-var-expression-list (cadr exp))
+               (cddr exp))
+        (get-exprs-of-var-expression-list var-expression-list)))
+
+; the exp in this case is a cons-chain, let*.var-exp-list.body
+(define (let*? exp) (tagged-list? exp 'let*))
+(define (let*->nested-lets exp)
+  ; if there's only one var-expression pair left, just turn the let* into a
+  ; let
+  (if (= 1 (length (cadr exp)))
+    (cons 'let (cdr exp))
+    (cons 'let (list (cadr exp))
+          (cons 'let* (cons (cdadr exp) (cddr exp))))))
+
 
 ; only numbers and strings are self-evaluating
 (define (self-evaluating? exp)
