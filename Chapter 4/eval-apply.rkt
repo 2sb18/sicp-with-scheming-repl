@@ -20,6 +20,7 @@
         ;                  env))
         ; begin is used to package a sequence of expressions into
         ; a single expression
+        ((while? exp) (eval (while->if exp) env))
         ((begin? exp)
          (eval-sequence (begin-actions exp) env))
         ; turn cond expression into an if expression then evaluate again
@@ -91,6 +92,21 @@
 ; SPECIFICATION OF THE SYNTAX 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define (while? exp) (tagged-list? exp 'while))
+
+(while predicate
+       body)
+
+to (if predicate
+     (begin body
+            (while predicate body)))
+
+(define (while->if exp)
+  (make-if (cadr exp)
+    (make-begin (list (cddr exp)
+                      exp))))
+
+
 (define (let? exp) (tagged-list? exp 'let))
 (define (get-vars-of-var-expression-list var-expression-list)
   (if (null? var-expression-list)
@@ -116,9 +132,9 @@
     ; we got the crazy special let form )
     (make-begin (list 
                   (cons 'define
-                        (cons (cons (cadr exp) (get-vars-of-var-expression-list (caddr)))
+                        (cons (cons (cadr exp) (get-vars-of-var-expression-list (caddr exp)))
                               (cdddr exp)))
-                  (cons (cadr exp) (get-exprs-of-var-expression-list (caddr)))))))
+                  (cons (cadr exp) (get-exprs-of-var-expression-list (caddr exp)))))))
 
 ; the exp in this case is a cons-chain, let*.var-exp-list.body
 (define (let*? exp) (tagged-list? exp 'let*))
