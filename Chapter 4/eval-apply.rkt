@@ -9,7 +9,7 @@
         ((quoted? exp) (text-of-quotation exp))
         ((assignment? exp) (eval-assignment exp env))
         ((definition? exp) (eval-definition exp env))
-        ((let? exp) (eval (let->combination exp env)))
+        ((let? exp) (eval (let->combination exp) env))
         ((if? exp) (eval-if exp env))
         ; ((lambda? exp)
         ;  (make-procedure (lambda-parameters exp)
@@ -90,7 +90,7 @@
 
 (define (let? exp) (tagged-list? exp 'let))
 
-(define (let->combination exp env)
+(define (let->combination exp)
   (cons (make-lambda (get-vars-of-var-expression-list (cadr exp))
                (caddr exp))
         (get-exprs-of-var-expression-list var-expression-list)))
