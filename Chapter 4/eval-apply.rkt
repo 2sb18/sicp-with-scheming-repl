@@ -64,15 +64,12 @@
  procedure-parameters
  procedure-body
  procedure-environment
- enclosing-environment
- first-frame
  add-binding-to-frame!
  extend-environment
  lookup-variable-value
  set-variable-value!
  define-variable!
-
- the-empty-environment
+ empty-environment
  )
 
 ; the eval procedure takes an expression and the environment that it's to be
@@ -356,30 +353,30 @@
 ; Exercise 4.11.  Instead of representing a frame as a pair of lists, we can represent a frame as a list of bindings, where each binding is a name-value pair. Rewrite the environment operations to use this alternative representation. 
 
 ; an environment is a list of frames
-(define (enclosing-environment env) (cdr env))
-(define (first-frame env) (car env))
-(define the-empty-environment '())
+(define (frame-bindings frame)
+  (car frame))
+(define (enclosing-frame frame)
+  (cdr frame))
+(define (empty-environment)
+  (cons '() '()))
 
-
-; we add variables to frames by pushing them onto the top
-; off both parts of the frame cons
 (define (add-binding-to-frame! var val frame)
-  (set! frame (cons (cons var val) frame)))
+  (set-car! frame (cons (cons var val) (car frame))))
 
-(define (extend-environment frame base-env)
-  (cons frame base-env))
+(define (extend-environment var-val-list base-env)
+  (cons var-val-list base-env))
 
 (define (lookup-variable-value var env)
   (define (lookup-variable-in-frame var frame)
     (cond ((null? frame) '())
           ((eq? var (caar frame)) (cdar frame))
           (else (lookup-variable-in-frame var (cdr frame)))))
-  (let ((value (lookup-variable-in-frame var (first-frame env))))
+  (let ((value (lookup-variable-in-frame var (car env))))
     (if (not (null? value))
       value
-      (if (eq? (enclosing-environment env) the-empty-environment)
+      (if (eq? (cdr env) '())
         '() ; variable wasn't found
-        (lookup-variable-value var (enclosing-environment env))))))
+        (lookup-variable-value var (cdr env))))))
 
 (define var-expression-list '())
 (define (set-variable-value! var val)
