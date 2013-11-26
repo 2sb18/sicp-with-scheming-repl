@@ -1,7 +1,81 @@
 
 
-
 #lang planet neil/sicp 
+
+(#%provide 
+ eval
+ list-of-values
+ eval-if
+ eval-sequence
+ eval-assignment
+ eval-definition
+ while?
+ while->if
+ let?
+ get-vars-of-var-expression-list
+ get-exprs-of-var-expression-list
+ let->combination
+ let*?
+ let*->nested-lets
+ self-evaluating?
+ variable?
+ quoted?
+ text-of-quotation
+ tagged-list?
+ assignment?
+ assignment-variable
+ assignment-value
+ definition?
+ definition-variable
+ definition-value
+ lambda?
+ lambda-parameters
+ lambda-body
+ make-lambda
+ if?
+ if-predicate
+ if-consequent
+ if-alternative
+ make-if
+ begin?
+ begin-actions
+ last-exp?
+ first-exp
+ rest-exps
+ sequence->exp
+ make-begin
+ application?
+ operator
+ operands
+ no-operands?
+ first-operand
+ rest-operands
+ cond?
+ cond-clauses
+ cond-else-clause?
+ cond-predicate
+ cond-actions
+ cond->if
+ expand-clauses
+ true?
+ false?
+ make-procedure
+ compound-procedure?
+ procedure-parameters
+ procedure-body
+ procedure-environment
+ enclosing-environment
+ first-frame
+ frame-variables
+ frame-values
+ add-binding-to-frame!
+ extend-environment
+ lookup-variable-value
+ set-variable-value!
+ define-variable!
+
+ the-empty-environment
+ )
 
 ; the eval procedure takes an expression and the environment that it's to be
 ; executed it
@@ -93,13 +167,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (while? exp) (tagged-list? exp 'while))
-
-(while predicate
-       body)
-
-to (if predicate
-     (begin body
-            (while predicate body)))
 
 (define (while->if exp)
   (make-if (cadr exp)
@@ -265,3 +332,74 @@ to (if predicate
                    (sequence->exp (cond-actions first))
                    (expand-clauses rest)))))))
 
+;;;;;;;;;
+; TESTING PREDICATES
+;;;;;;;;;
+; anything that isn't an explicit false is true
+(define (true? x)
+  (not (eq? x false)))
+(define (false? x)
+  (eq? x false))
+
+;;;;;;;;;
+; REPRESENTING PROCEDURES
+;;;;;;;;;
+(define (make-procedure parameters body env)
+  (list 'procedure parameters body env))
+(define (compound-procedure? p)
+  (tagged-list? p 'procedure))
+(define (procedure-parameters p) (cadr p))
+(define (procedure-body p) (caddr p))
+(define (procedure-environment p) (cadddr p))
+
+;;;;;;;;;
+; OPERATIONS ON ENVIRONMENTS
+;;;;;;;;;
+
+; an environment is a list of frames
+(define (enclosing-environment env) (cdr env))
+(define (first-frame env) (car env))
+(define the-empty-environment '())
+
+; a frame is a cons, built of variables and values
+; make-frame should only be called by extend-environment,
+; shouldn't be called by user
+(define (make-frame variables values)
+  (cons variables values))
+(define (frame-variables frame) (car frame))
+(define (frame-values frame) (cdr frame))
+; we add variables to frames by pushing them onto the top
+; off both parts of the frame cons
+(define (add-binding-to-frame! var val frame)
+  (set-car! frame (cons var (car frame)))
+  (set-cdr! frame (cons val (cdr frame))))
+
+; 
+(define (extend-environment vars vals base-env)
+  (if (= (length vars) (length vals))
+    (cons (make-frame vars vals) base-env)
+    (if (< (length vars) (length vals))
+      (error "Too many arguments supplied" vars vals)
+      (error "Too few arguments supplied" vars vals))))
+
+(define (lookup-variable-value var env)
+  (define (lookup-variable-in-frame var frame)
+    (cond ((null? frame) '())
+          ((null? (frame-variables frame)) '())
+          ((eq? var (car (frame-variables frame)))
+           (car (frame-values frame)))
+          (else (lookup-variable-in-frame var (cons (cdr (frame-variables frame))
+                                                    (cdr (frame-values frame)))))))
+  (let ((value (lookup-variable-in-frame var (first-frame env))))
+    (if (not (null? value))
+      value
+      (if (eq? (enclosing-environment env) the-empty-environment)
+        '() ; variable wasn't found
+        (lookup-variable-value var (enclosing-environment env))))))
+
+
+(define (set-variable-value! meow)
+  meow)
+(define (define-variable! meow)
+  meow)
+(define var-expression-list '())
