@@ -355,8 +355,8 @@
 ; an environment is a list of frames
 (define (frame-bindings frame)
   (car frame))
-(define (enclosing-frame frame)
-  (cdr frame))
+(define (enclosing-environment env)
+  (cdr env))
 (define (empty-environment)
   (cons '() '()))
 
@@ -366,21 +366,39 @@
 (define (extend-environment var-val-list base-env)
   (cons var-val-list base-env))
 
-(define (lookup-variable-value var env)
+(define (return-variable-value var env)
   (define (lookup-variable-in-frame var frame)
     (cond ((null? frame) '())
-          ((eq? var (caar frame)) (cdar frame))
+          ((eq? var (caar frame)) (car frame))
           (else (lookup-variable-in-frame var (cdr frame)))))
-  (let ((value (lookup-variable-in-frame var (car env))))
-    (if (not (null? value))
-      value
-      (if (eq? (cdr env) '())
-        '() ; variable wasn't found
-        (lookup-variable-value var (cdr env))))))
+  (let ((variable-value (lookup-variable-in-frame var (frame-bindings env))))
+    (if (not (null? variable-value))
+      variable-value
+      (if (eq? (enclosing-environment env) '())
+        '() ; variable-value wasn't found
+        (return-variable-value var (enclosing-environment env))))))
+
+(define (lookup-variable-value var env)
+  (let ((variable-value (return-variable-value var env)))
+    (if (null? variable-value)
+      (error "couldn't find variable -- LOOKUP-VARIABLE-VALUE" var env) 
+      (cdr variable-value))))
 
 (define var-expression-list '())
-(define (set-variable-value! var val)
-  'meow)
 
-(define (define-variable! var val)
-  'meow)
+(define (set-variable-value! var val env)
+  ; first we want to get the variable to set
+  (let ((variable-value (return-variable-value var env)))
+    (if (null? variable-value)
+      (error "couldn't find variable -- SET-VARIABLE-VALUE!" var val env)
+      (set-cdr! variable-value val))))
+
+
+(define (define-variable! var val env)
+  ; we only want to search the first frame
+  (let ((first-frame-only (cons (frame-bindings env) '())))
+    (let ((variable-value (return-variable-value var first-frame-only)))
+      (if (null? variable-value)
+        (add-binding-to-frame! var val env)
+        (set-cdr! variable-value val)))))
+
