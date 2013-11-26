@@ -66,8 +66,6 @@
  procedure-environment
  enclosing-environment
  first-frame
- frame-variables
- frame-values
  add-binding-to-frame!
  extend-environment
  lookup-variable-value
@@ -355,41 +353,27 @@
 ;;;;;;;;;
 ; OPERATIONS ON ENVIRONMENTS
 ;;;;;;;;;
+; Exercise 4.11.  Instead of representing a frame as a pair of lists, we can represent a frame as a list of bindings, where each binding is a name-value pair. Rewrite the environment operations to use this alternative representation. 
 
 ; an environment is a list of frames
 (define (enclosing-environment env) (cdr env))
 (define (first-frame env) (car env))
 (define the-empty-environment '())
 
-; a frame is a cons, built of variables and values
-; make-frame should only be called by extend-environment,
-; shouldn't be called by user
-(define (make-frame variables values)
-  (cons variables values))
-(define (frame-variables frame) (car frame))
-(define (frame-values frame) (cdr frame))
+
 ; we add variables to frames by pushing them onto the top
 ; off both parts of the frame cons
 (define (add-binding-to-frame! var val frame)
-  (set-car! frame (cons var (car frame)))
-  (set-cdr! frame (cons val (cdr frame))))
+  (set! frame (cons (cons var val) frame)))
 
-; 
-(define (extend-environment vars vals base-env)
-  (if (= (length vars) (length vals))
-    (cons (make-frame vars vals) base-env)
-    (if (< (length vars) (length vals))
-      (error "Too many arguments supplied" vars vals)
-      (error "Too few arguments supplied" vars vals))))
+(define (extend-environment frame base-env)
+  (cons frame base-env))
 
 (define (lookup-variable-value var env)
   (define (lookup-variable-in-frame var frame)
     (cond ((null? frame) '())
-          ((null? (frame-variables frame)) '())
-          ((eq? var (car (frame-variables frame)))
-           (car (frame-values frame)))
-          (else (lookup-variable-in-frame var (cons (cdr (frame-variables frame))
-                                                    (cdr (frame-values frame)))))))
+          ((eq? var (caar frame)) (cdar frame))
+          (else (lookup-variable-in-frame var (cdr frame)))))
   (let ((value (lookup-variable-in-frame var (first-frame env))))
     (if (not (null? value))
       value
@@ -397,9 +381,9 @@
         '() ; variable wasn't found
         (lookup-variable-value var (enclosing-environment env))))))
 
-
-(define (set-variable-value! meow)
-  meow)
-(define (define-variable! meow)
-  meow)
 (define var-expression-list '())
+(define (set-variable-value! var val)
+  'meow)
+
+(define (define-variable! var val)
+  'meow)
