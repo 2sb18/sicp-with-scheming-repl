@@ -1,5 +1,6 @@
 
 
+
 #lang planet neil/sicp 
 
 (#%provide 
@@ -64,22 +65,25 @@
  procedure-parameters
  procedure-body
  procedure-environment
+ frame-bindings
  add-binding-to-frame!
  extend-environment
  lookup-variable-value
  set-variable-value!
  define-variable!
+ unbind!
  empty-environment
  )
 
 ; the eval procedure takes an expression and the environment that it's to be
-; executed it
+; executed in
 (define (eval exp env)
   (cond ((self-evaluating? exp) exp)
         ; ((variable? exp) (lookup-variable-value exp env))
         ((quoted? exp) (text-of-quotation exp))
         ((assignment? exp) (eval-assignment exp env))
         ((definition? exp) (eval-definition exp env))
+        ((make-unbound? exp) (eval-make-unbound? exp env))
         ((let? exp) (eval (let->combination exp) env))
         ((let*? exp) (eval (let*->nested-lets exp) env))
         ((if? exp) (eval-if exp env))
@@ -156,6 +160,10 @@
                    (eval (definition-value exp) env)
                    env)
   'ok)
+
+; ex. exp would equal (make-unbound! cat)
+(define (eval-make-unbound? exp env)
+  (unbind! (cadr exp) env))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; SPECIFICATION OF THE SYNTAX 
@@ -246,6 +254,10 @@
     (caddr exp)
     (make-lambda (cdadr exp)    ; formal parameters
                  (cddr exp))))  ; body
+
+(define (make-unbound? exp)
+  (tagged-list? exp 'make-unbound!))
+
 
 (define (lambda? exp) (tagged-list? exp 'lambda))
 (define (lambda-parameters exp) (cadr exp))
@@ -401,4 +413,29 @@
       (if (null? variable-value)
         (add-binding-to-frame! var val env)
         (set-cdr! variable-value val)))))
+
+; but on the other hand, you can set! variables in enclosing
+; frames so why can't you unbind them?
+; being able to unbind enclosing frames is dangerous but maybe
+; also powerful, let's allow for it
+; return true if it happened, error if it
+; didn't
+(define (unbind! var env)
+  ; returns true or false depending on whether unbinding
+  ; was successful 
+  (define (unbind-in-frame frame)
+    (cond ((null? frame) #f)
+          ((null? (cdr frame)) #f)
+          ((eq? var (caadr frame))
+           (begin (set-cdr! frame (cddr frame))
+                  #t))
+          (else (unbind-in-frame (cdr frame)))))
+  (cond ((null? env)
+         (error "couldn't find variable -- UNBIND!" var env))
+        ; if the frame doesn't have any bindings
+        ((null? (car env)) (unbind! var (cdr env)))
+        ; if the var is the first in the frame...
+        ((eq? var (caaar env)) (set-car! env (cdar env)))
+        ((unbind-in-frame (frame-bindings env)))
+        (else (unbind! var (cdr env)))))
 

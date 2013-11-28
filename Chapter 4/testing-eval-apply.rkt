@@ -32,3 +32,8 @@
 
 (add-binding-to-frame! 'd 0.1 c)
 
+(unbind! 'd c)
+(unbind! 'e c)
+(unbind! 'a c)
+
+
