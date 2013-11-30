@@ -1,7 +1,10 @@
 
 
 
+
+
 #lang planet neil/sicp 
+
 
 (#%provide 
  eval
@@ -75,11 +78,30 @@
  empty-environment
  )
 
+
+(define (apply-in-underlying-scheme procedure arguments)
+  (apply procedure arguments))
+
+; arguments is a list of arguments
+(define (our-apply procedure arguments)
+  (cond ((primitive-procedure? procedure)
+         (apply-primitive-procedure procedure arguments))
+        ((compound-procedure? procedure)
+         (eval-sequence
+           (procedure-body procedure)
+           (extend-environment
+             (procedure-parameters procedure)
+             arguments
+             (procedure-environment procedure))))
+        (else
+          (error
+            "Unkown procedure type -- APPLY" procedure))))
+
 ; the eval procedure takes an expression and the environment that it's to be
 ; executed in
 (define (eval exp env)
   (cond ((self-evaluating? exp) exp)
-        ; ((variable? exp) (lookup-variable-value exp env))
+        ((variable? exp) (lookup-variable-value exp env))
         ((quoted? exp) (text-of-quotation exp))
         ((assignment? exp) (eval-assignment exp env))
         ((definition? exp) (eval-definition exp env))
@@ -87,10 +109,10 @@
         ((let? exp) (eval (let->combination exp) env))
         ((let*? exp) (eval (let*->nested-lets exp) env))
         ((if? exp) (eval-if exp env))
-        ; ((lambda? exp)
-        ;  (make-procedure (lambda-parameters exp)
-        ;                  (lambda-body exp)
-        ;                  env))
+        ((lambda? exp)
+          (make-procedure (lambda-parameters exp)
+                          (lambda-body exp)
+                          env))
         ; begin is used to package a sequence of expressions into
         ; a single expression
         ((while? exp) (eval (while->if exp) env))
@@ -102,27 +124,16 @@
         ; an application is just (function a b ..) where a and b are arguments
         ; so what if this was send (meow (if a b c) d)?
 
-        ; ((application? exp)
+        ((application? exp)
         ;   the (operator exp) just takes the first element of the expression
-        ;  (apply (eval (operator exp) env)
-        ;         (list-of-values (operands exp) env)))
+         (our-apply (eval (operator exp) env)
+                (list-of-values (operands exp) env)))
         (else
           (error "Unknown expression type -- EVAL" exp))))
 
-; arguments is a list of arguments
-; (define (apply procedure arguments)
-;   (cond ((primitive-procedure? procedure)
-;          (apply-primitive-procedure procedure arguments))
-;         ((compound-procedure? procedure)
-;          (eval-sequence
-;            (procedure-body procedure)
-;            (extend-environment
-;              (procedure-parameters procedure)
-;              arguments
-;              (procedure-environment procedure))))
-;         (else
-;           (error
-;             "Unknown procedure type -- APPLY" procedure))))
+
+
+
 
 ; I think exps is a list of the operands
 ; so this turns a list of operands into a list of values
@@ -157,8 +168,8 @@
 
 (define (eval-definition exp env)
   (define-variable! (definition-variable exp)
-                   (eval (definition-value exp) env)
-                   env)
+                    (eval (definition-value exp) env)
+                    env)
   'ok)
 
 ; ex. exp would equal (make-unbound! cat)
@@ -173,9 +184,8 @@
 
 (define (while->if exp)
   (make-if (cadr exp)
-    (make-begin (list (cddr exp)
-                      exp))))
-
+           (make-begin (list (cddr exp)
+                             exp))))
 
 (define (let? exp) (tagged-list? exp 'let))
 (define (get-vars-of-var-expression-list var-expression-list)
@@ -244,11 +254,11 @@
 
 (define (definition? exp)
   (tagged-list? exp 'define))
+; ex. exp = (define x 3), this should return x
 (define (definition-variable exp)
   (if (symbol? (cadr exp))
-    (caddr exp)
-    (make-lambda (cdadr exp)     
-                 (cddr exp))))   
+    (cadr exp)
+    (caadr exp)))   
 (define (definition-value exp)
   (if (symbol? (cadr exp))
     (caddr exp)
@@ -375,8 +385,22 @@
 (define (add-binding-to-frame! var val frame)
   (set-car! frame (cons (cons var val) (car frame))))
 
-(define (extend-environment var-val-list base-env)
-  (cons var-val-list base-env))
+(define (make-frame variables values base-env)
+  (let ((frame-to-return (cons '() base-env)))
+    (define (make-frame-iter variables values)
+      (if (null? variables)
+        frame-to-return
+        (begin (add-binding-to-frame! (car variables) (car values) frame-to-return)
+               (make-frame-iter (cdr variables) (cdr values))))) 
+    (make-frame-iter variables values)))
+
+; extend-environment should take a list of vars and a list of values
+(define (extend-environment vars vals base-env)
+  (if (= (length vars) (length vals))
+    (make-frame vars vals base-env) 
+    (if (< (length vars) (length vals))
+      (error "Too many arguments supplied" vars vals)
+      (error "Too few arguments supplied" vars vals))))
 
 (define (return-variable-value var env)
   (define (lookup-variable-in-frame var frame)
@@ -405,7 +429,7 @@
       (error "couldn't find variable -- SET-VARIABLE-VALUE!" var val env)
       (set-cdr! variable-value val))))
 
-
+; add a binding to the current frame given by env
 (define (define-variable! var val env)
   ; we only want to search the first frame
   (let ((first-frame-only (cons (frame-bindings env) '())))
@@ -438,4 +462,71 @@
         ((eq? var (caaar env)) (set-car! env (cdar env)))
         ((unbind-in-frame (frame-bindings env)))
         (else (unbind! var (cdr env)))))
+
+(define primitive-procedures
+  (list (list 'car car)
+        (list 'cdr cdr)
+        (list 'cons cons)
+        (list '+ +)
+        (list 'null? null?)))
+
+(define (primitive-procedure-names)
+  (map car
+       primitive-procedures))
+(define (primitive-procedure-objects)
+  (map (lambda (proc) (list 'primitive (cadr proc)))
+       primitive-procedures))
+
+(define (setup-environment)
+  (let ((initial-env
+          (extend-environment (primitive-procedure-names)
+                              (primitive-procedure-objects)
+                              (empty-environment))))
+
+    (define-variable! 'true true initial-env)
+    (define-variable! 'false false initial-env)
+    initial-env))
+(define the-global-environment (setup-environment))
+
+(define (primitive-procedure? proc)
+  (tagged-list? proc 'primitive))
+
+(define (primitive-implementation proc) (cadr proc))
+
+(define (apply-primitive-procedure proc args)
+  (apply-in-underlying-scheme    ; apply-in-underlying-scheme
+   (primitive-implementation proc) args))
+
+
+(define input-prompt ";;; M-Eval input: ")
+(define output-prompt ";;; M-Eval value: ")
+(define (driver-loop)
+  (prompt-for-input input-prompt)
+  (let ((input (read)))
+    (let ((output (eval input the-global-environment)))
+      (announce-output output-prompt)
+      (user-print output)))
+  (driver-loop))
+(define (prompt-for-input string)
+  (newline) (display string))
+
+(define (announce-output string)
+  (display string))
+
+(define (user-print object)
+  (if (compound-procedure? object)
+      (display (list 'compound-procedure
+                     (procedure-parameters object)
+                     (procedure-body object)
+                     '<procedure-env>))
+      (display object)))
+
+; (driver-loop)
+
+; this procedure makes it faster to write evals
+(define (e expression) (eval expression the-global-environment))
+
+(e '(define x 3))
+(e '(define (meow x) (+ x 4)))
+
 
