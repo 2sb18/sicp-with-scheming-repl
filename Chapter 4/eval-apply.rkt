@@ -470,24 +470,9 @@
         (list 'cdr cdr)
         (list 'cons cons)
         (list '+ +)
-        ; get error application: not a procedure
-        (list 'map map)       ; Louis' system version of map which should go horribly wrong
-        ; why does it go horribly wrong? 
-        ; the system apply function requires two arguments. the first
-        ; is the procedure to be applied, the second is a list of arguments
-        ; to be applied to that procedure. so we say something like
-        ; (eval '(map (lambda (x) (+ 1 x)) (cons 1 '())) the-global-environment)
-        ; our eval function sees this as an application, so it evaluates
-        ; the operands. the lambda becomes a procedure that has a pointer
-        ; to the global environment
-        ; the map primitive wants to see a primitive lambda, not a
-        ; procedure that has a pointer to an environment.
-
-
-        ; but why does it work when we define map in our outer-layer lisp?
-        ; we say (define (map proc lst) (...blah blah...)
-        ; this is defined just like any other procedure defined in our
-        ; new language, with a pointer to the proc that doesn't change
+        (list '- -)
+        (list '* *)
+        (list '= =)
         (list 'display display)
         (list 'null? null?)))
 
@@ -546,11 +531,5 @@
       (display object)))
 
 ; (driver-loop)
-
-; this procedure makes it faster to write evals
-; (define (e expression) (eval expression the-global-environment))
-; 
-; (e '(define x 3))
-; (e '(define (meow x) (+ x 4)))
 
 
