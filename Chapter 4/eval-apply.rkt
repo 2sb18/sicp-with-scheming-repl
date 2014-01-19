@@ -5,6 +5,7 @@
 
 #lang planet neil/sicp 
 
+(#%require "../pretty-list-printer.rkt")
 
 (#%provide 
  eval
@@ -110,9 +111,9 @@
         ((let*? exp) (eval (let*->nested-lets exp) env))
         ((if? exp) (eval-if exp env))
         ((lambda? exp)
-          (make-procedure (lambda-parameters exp)
-                          (lambda-body exp)
-                          env))
+         (make-procedure (lambda-parameters exp)
+                         (lambda-body exp)
+                         env))
         ; begin is used to package a sequence of expressions into
         ; a single expression
         ((while? exp) (eval (while->if exp) env))
@@ -125,9 +126,9 @@
         ; so what if this was send (meow (if a b c) d)?
 
         ((application? exp)
-        ;   the (operator exp) just takes the first element of the expression
+         ;   the (operator exp) just takes the first element of the expression
          (our-apply (eval (operator exp) env)
-                (list-of-values (operands exp) env)))
+                    (list-of-values (operands exp) env)))
         (else
           (error "Unknown expression type -- EVAL" exp))))
 
@@ -502,34 +503,29 @@
 (define (apply-primitive-procedure proc args)
   ; (display "procedure: ") (display (primitive-implementation proc)) (newline)
   ; (display "arguments: ") (display args) (newline)
-  
+
   (apply-in-underlying-scheme    ; apply-in-underlying-scheme
-   (primitive-implementation proc) args))
+    (primitive-implementation proc) args))
 
 
-(define input-prompt ";;; M-Eval input: ")
-(define output-prompt ";;; M-Eval value: ")
 (define (driver-loop)
-  (prompt-for-input input-prompt)
+  (newline)
+  (display "M-eval> ")
   (let ((input (read)))
     (let ((output (eval input the-global-environment)))
-      (announce-output output-prompt)
+      (newline)
       (user-print output)))
   (driver-loop))
-(define (prompt-for-input string)
-  (newline) (display string))
-
-(define (announce-output string)
-  (display string))
 
 (define (user-print object)
-  (if (compound-procedure? object)
-      (display (list 'compound-procedure
-                     (procedure-parameters object)
-                     (procedure-body object)
-                     '<procedure-env>))  ; interesting, don't know how the < > brackets work
-      (display object)))
+  (cond ((compound-procedure? object)
+         (display (list 'compound-procedure
+                        (procedure-parameters object)
+                        (procedure-body object)
+                        '<procedure-env>)))  ; interesting, don't know how the < > brackets work
+        ((pair? object) (plp object))
+        (else (display object))))
 
-; (driver-loop)
+(driver-loop)
 
 
