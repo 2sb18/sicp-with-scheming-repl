@@ -363,6 +363,27 @@
 (define (procedure-body p) (caddr p))
 (define (procedure-environment p) (cadddr p))
 
+; scan-out-defines takes a procedure body and returns
+; an equivalent one that has not internal definitions
+
+; (lambda <vars>
+;   (define u <e1>)
+;   (define v <e2>)
+;   <e3>)
+;
+; would be transformed into
+;
+; (lambda <vars>
+;   (let ((u '*unassigned*)
+;         (v '*unassigned*))
+;     (set! u <e1>)
+;     (set! v <e2>)
+;     <e3>))
+; (define (scan-out-defines procedure-body)
+;   )
+
+
+
 ;;;;;;;;;
 ; OPERATIONS ON ENVIRONMENTS
 ;;;;;;;;;
@@ -412,7 +433,9 @@
   (let ((variable-value (return-variable-value var env)))
     (if (null? variable-value)
       (error "couldn't find variable -- LOOKUP-VARIABLE-VALUE" var env) 
-      (cdr variable-value))))
+      (if (eq? (cdr variable-value) '*unassigned*)
+        (error "value of variable is unassigned -- LOOKUP-VARIABLE-VALUE" var env)
+        (cdr variable-value)))))
 
 (define var-expression-list '())
 
