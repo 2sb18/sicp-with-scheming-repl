@@ -134,4 +134,4 @@
                            (glue-car-and-cdr car-strings (make-pointer-cdr)))
                          (print-cons (cdr the-cons))))))
 
-(plp  (cons (cons 3 (cons 4 '())) (cons (cons 4 (cons 'meow '())) "hello")))
+; (plp  (cons (cons 3 (cons 4 '())) (cons (cons 4 (cons 'meow '())) "hello")))

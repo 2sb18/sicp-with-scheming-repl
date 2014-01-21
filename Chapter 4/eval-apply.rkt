@@ -1,8 +1,3 @@
-
-
-
-
-
 #lang planet neil/sicp 
 
 (#%require "../pretty-list-printer.rkt")
@@ -22,8 +17,6 @@
  let->combination
  let*?
  let*->nested-lets
- self-evaluating?
- variable?
  quoted?
  text-of-quotation
  tagged-list?
@@ -77,6 +70,8 @@
  define-variable!
  unbind!
  empty-environment
+ the-global-environment
+ its
  )
 
 
@@ -101,36 +96,40 @@
 ; the eval procedure takes an expression and the environment that it's to be
 ; executed in
 (define (eval exp env)
-  (cond ((self-evaluating? exp) exp)
-        ((variable? exp) (lookup-variable-value exp env))
-        ((quoted? exp) (text-of-quotation exp))
-        ((assignment? exp) (eval-assignment exp env))
-        ((definition? exp) (eval-definition exp env))
-        ((make-unbound? exp) (eval-make-unbound? exp env))
-        ((let? exp) (eval (let->combination exp) env))
-        ((let*? exp) (eval (let*->nested-lets exp) env))
-        ((if? exp) (eval-if exp env))
-        ((lambda? exp)
-         (make-procedure (lambda-parameters exp)
-                         (lambda-body exp)
-                         env))
-        ; begin is used to package a sequence of expressions into
-        ; a single expression
-        ((while? exp) (eval (while->if exp) env))
-        ((begin? exp)
-         (eval-sequence (begin-actions exp) env))
-        ; turn cond expression into an if expression then evaluate again
-        ((cond? exp) (eval (cond->if exp) env))
-        ; this is the last thing, so maybe the operator is a procedural call
-        ; an application is just (function a b ..) where a and b are arguments
-        ; so what if this was send (meow (if a b c) d)?
+  (cond 
+    ; self-evaluating?
+    ((number? exp) exp)
+    ((string? exp) exp)
+    ; variable? variables are represented by symbols
+    ((symbol? exp) (lookup-variable-value exp env))
+    ((quoted? exp) (text-of-quotation exp))
+    ((assignment? exp) (eval-assignment exp env))
+    ((definition? exp) (eval-definition exp env))
+    ((make-unbound? exp) (eval-make-unbound? exp env))
+    ((let? exp) (eval (let->combination exp) env))
+    ((let*? exp) (eval (let*->nested-lets exp) env))
+    ((if? exp) (eval-if exp env))
+    ((lambda? exp)
+     (make-procedure (lambda-parameters exp)
+                     (lambda-body exp)
+                     env))
+    ; begin is used to package a sequence of expressions into
+    ; a single expression
+    ((while? exp) (eval (while->if exp) env))
+    ((begin? exp)
+     (eval-sequence (begin-actions exp) env))
+    ; turn cond expression into an if expression then evaluate again
+    ((cond? exp) (eval (cond->if exp) env))
+    ; this is the last thing, so maybe the operator is a procedural call
+    ; an application is just (function a b ..) where a and b are arguments
+    ; so what if this was send (meow (if a b c) d)?
 
-        ((application? exp)
-         ;   the (operator exp) just takes the first element of the expression
-         (our-apply (eval (operator exp) env)
-                    (list-of-values (operands exp) env)))
-        (else
-          (error "Unknown expression type -- EVAL" exp))))
+    ((application? exp)
+     ;   the (operator exp) just takes the first element of the expression
+     (our-apply (eval (operator exp) env)
+                (list-of-values (operands exp) env)))
+    (else
+      (error "Unknown expression type -- EVAL" exp))))
 
 
 
@@ -226,15 +225,6 @@
     (cons 'let (cdr exp))
     (cons 'let (list (cadr exp))
           (cons 'let* (cons (cdadr exp) (cddr exp))))))
-
-; only numbers and strings are self-evaluating
-(define (self-evaluating? exp)
-  (cond ((number? exp) true)
-        ((string? exp) true)
-        (else false)))
-
-; variables are represented by symbols
-(define (variable? exp) (symbol? exp))
 
 (define (quoted? exp)
   (tagged-list? exp 'quote))
@@ -507,25 +497,34 @@
   (apply-in-underlying-scheme    ; apply-in-underlying-scheme
     (primitive-implementation proc) args))
 
+; input to system
+(define (its exp)
+  (user-print (eval exp the-global-environment)))
 
 (define (driver-loop)
   (newline)
   (display "M-eval> ")
   (let ((input (read)))
-    (let ((output (eval input the-global-environment)))
-      (newline)
-      (user-print output)))
+    ; (read) seems to take the input and figure out what kind of type it
+    ; is, so that our eval procedure can handle it properly
+    ; typing in "hello" (without the quotations) results in a symbol sent
+    ; typing in "'(1 2 3)" results in a list sent
+    (if (eq? input 'the-global-environment)
+      (display the-global-environment)
+      (let ((output (eval input the-global-environment)))
+        (newline)
+        (user-print output))))
   (driver-loop))
 
 (define (user-print object)
   (cond ((compound-procedure? object)
-         (display (list 'compound-procedure
-                        (procedure-parameters object)
-                        (procedure-body object)
-                        '<procedure-env>)))  ; interesting, don't know how the < > brackets work
+         (plp (list 'procedure
+                    (procedure-parameters object)
+                    (procedure-body object))))
         ((pair? object) (plp object))
         (else (display object))))
 
 (driver-loop)
+
 
 
