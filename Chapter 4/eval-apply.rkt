@@ -72,6 +72,7 @@
  empty-environment
  the-global-environment
  its
+ driver-loop
  )
 
 
@@ -499,7 +500,11 @@
 
 ; input to system
 (define (its exp)
-  (user-print (eval exp the-global-environment)))
+  (if (eq? exp 'the-global-environment)
+    (display the-global-environment)
+    (let ((output (eval exp the-global-environment)))
+      (user-print output)
+      (newline))))
 
 (define (driver-loop)
   (newline)
@@ -524,7 +529,5 @@
         ((pair? object) (plp object))
         (else (display object))))
 
-(driver-loop)
-
-
+; (driver-loop)
 
