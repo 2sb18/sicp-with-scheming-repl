@@ -3,7 +3,7 @@
 (#%require "../pretty-list-printer.rkt")
 
 (#%provide 
- eval
+ our-eval
  list-of-values
  eval-if
  eval-sequence
@@ -73,6 +73,9 @@
  the-global-environment
  its
  driver-loop
+ plp
+ scan-out-defines 
+ procedure-body
  )
 
 
@@ -94,9 +97,9 @@
           (error
             "Unkown procedure type -- APPLY" procedure))))
 
-; the eval procedure takes an expression and the environment that it's to be
+; the our-eval procedure takes an expression and the environment that it's to be
 ; executed in
-(define (eval exp env)
+(define (our-eval exp env)
   (cond 
     ; self-evaluating?
     ((number? exp) exp)
@@ -104,30 +107,32 @@
     ; variable? variables are represented by symbols
     ((symbol? exp) (lookup-variable-value exp env))
     ((quoted? exp) (text-of-quotation exp))
+    ; something is an assignment if it starts with set!
     ((assignment? exp) (eval-assignment exp env))
     ((definition? exp) (eval-definition exp env))
     ((make-unbound? exp) (eval-make-unbound? exp env))
-    ((let? exp) (eval (let->combination exp) env))
-    ((let*? exp) (eval (let*->nested-lets exp) env))
+    ((let? exp) (our-eval (let->combination exp) env))
+    ((let*? exp) (our-eval (let*->nested-lets exp) env))
     ((if? exp) (eval-if exp env))
+    ; an expression is lambda if it starts with 'lambda
     ((lambda? exp)
      (make-procedure (lambda-parameters exp)
                      (lambda-body exp)
                      env))
     ; begin is used to package a sequence of expressions into
     ; a single expression
-    ((while? exp) (eval (while->if exp) env))
+    ((while? exp) (our-eval (while->if exp) env))
     ((begin? exp)
      (eval-sequence (begin-actions exp) env))
     ; turn cond expression into an if expression then evaluate again
-    ((cond? exp) (eval (cond->if exp) env))
+    ((cond? exp) (our-eval (cond->if exp) env))
     ; this is the last thing, so maybe the operator is a procedural call
     ; an application is just (function a b ..) where a and b are arguments
     ; so what if this was send (meow (if a b c) d)?
 
     ((application? exp)
      ;   the (operator exp) just takes the first element of the expression
-     (our-apply (eval (operator exp) env)
+     (our-apply (our-eval (operator exp) env)
                 (list-of-values (operands exp) env)))
     (else
       (error "Unknown expression type -- EVAL" exp))))
@@ -145,18 +150,18 @@
 (define (list-of-values exps env)
   (if (no-operands? exps)
     '()
-    (let ((left (eval (first-operand exps) env)))
+    (let ((left (our-eval (first-operand exps) env)))
       (let ((right (list-of-values (rest-operands exps) env)))
         (cons left right)))))
 
 (define (eval-if exp env)
-  (if (true? (eval (if-predicate exp) env))
-    (eval (if-consequent exp) env)
-    (eval (if-alternative exp) env)))
+  (if (true? (our-eval (if-predicate exp) env))
+    (our-eval (if-consequent exp) env)
+    (our-eval (if-alternative exp) env)))
 
 (define (eval-sequence exps env)
-  (cond ((last-exp? exps) (eval (first-exp exps) env))
-        (else (eval (first-exp exps) env)
+  (cond ((last-exp? exps) (our-eval (first-exp exps) env))
+        (else (our-eval (first-exp exps) env)
               (eval-sequence (rest-exps) env))))
 
 ; set-variable-value puts the variable and value intto the
@@ -169,7 +174,7 @@
 
 (define (eval-definition exp env)
   (define-variable! (definition-variable exp)
-                    (eval (definition-value exp) env)
+                    (our-eval (definition-value exp) env)
                     env)
   'ok)
 
@@ -197,19 +202,21 @@
 (define (get-exprs-of-var-expression-list var-expression-list)
   (if (null? var-expression-list)
     '()
-    ; !!! pretty sure var-expression pair is just a cons, not a list
-    (cons (cdar var-expression-list )
+    (cons (cadar var-expression-list )
           (get-exprs-of-var-expression-list (cdr var-expression-list)))))
 
-; the exp in this case is a cons-chain, let.var-exp-list.body
-; special form of let is let.var.var-exp-list.body where body is binded
+; the exp is a list, (let var-exp-list body)
+;                  = (let ((a 3) (b 4)) body)
+; special form of let is (let var var-exp-list body) where body is binded
 ; to var, so that it can call itself
+;
+; lets get turned into a application of a lambda
 (define (let->combination exp)
   ; if there's only three elements in the let, it's normal form
-  (if (not (pair? (cddr exp)))
+  (if (= 3 (length exp))
     (cons (make-lambda (get-vars-of-var-expression-list (cadr exp))
-                       (cddr exp))
-          (get-exprs-of-var-expression-list var-expression-list))
+                       (caddr exp))
+          (get-exprs-of-var-expression-list (cadr exp)))
     ; we got the crazy special let form )
     (make-begin (list 
                   (cons 'define
@@ -217,15 +224,17 @@
                               (cdddr exp)))
                   (cons (cadr exp) (get-exprs-of-var-expression-list (caddr exp)))))))
 
-; the exp in this case is a cons-chain, let*.var-exp-list.body
 (define (let*? exp) (tagged-list? exp 'let*))
 (define (let*->nested-lets exp)
   ; if there's only one var-expression pair left, just turn the let* into a
   ; let
   (if (= 1 (length (cadr exp)))
     (cons 'let (cdr exp))
-    (cons 'let (list (cadr exp))
-          (cons 'let* (cons (cdadr exp) (cddr exp))))))
+    (list 'let 
+          (list (caadr exp))
+          (list 'let*
+                (cdadr exp)
+                (caddr exp)))))
 
 (define (quoted? exp)
   (tagged-list? exp 'quote))
@@ -249,11 +258,15 @@
 ; ex. exp = (define x 3), this should return x
 (define (definition-variable exp)
   (if (symbol? (cadr exp))
+    ; if it's a variable
     (cadr exp)
+    ; if it's a procedure
     (caadr exp)))   
 (define (definition-value exp)
   (if (symbol? (cadr exp))
+    ; if symbol
     (caddr exp)
+    ; if procedure
     (make-lambda (cdadr exp)    ; formal parameters
                  (cddr exp))))  ; body
 
@@ -261,12 +274,13 @@
   (tagged-list? exp 'make-unbound!))
 
 
+; a lambda expression looks like: '(lambda parameters body)
 (define (lambda? exp) (tagged-list? exp 'lambda))
 (define (lambda-parameters exp) (cadr exp))
 (define (lambda-body exp) (cddr exp))
 
 (define (make-lambda parameters body)
-  (cons 'lambda (cons parameters body)))
+  (list 'lambda parameters body))
 
 ; will accept something like (if meow boo hoo)
 (define (if? exp) (tagged-list? exp 'if))
@@ -333,7 +347,7 @@
         ; is the (<test> => <recipient>) syntax is being used?
         (if (and (= 3 (length first)) (eq? '=> (list-ref first 1)))
           ; kinda ugly but we're doing the evaluation right here
-          (let ((predicate (eval (car first))))
+          (let ((predicate (our-eval (car first))))
             (if (true? predicate)
               ((caddr first) predicate)
               (expand-clauses rest)))
@@ -355,7 +369,10 @@
 ;;;;;;;;;
 
 ; right, each procedure points to an env
+; parameters is a list of parameters
+; body is a list structure
 (define (make-procedure parameters body env)
+  ; (list 'procedure parameters (scan-out-defines body) env))
   (list 'procedure parameters body env))
 (define (compound-procedure? p)
   (tagged-list? p 'procedure))
@@ -379,8 +396,38 @@
 ;     (set! u <e1>)
 ;     (set! v <e2>)
 ;     <e3>))
-; (define (scan-out-defines procedure-body)
-;   )
+(define (scan-out-defines procedure-body)
+  (define (get-defines procedure-body)
+    (if (null? procedure-body)
+      '()
+      (if (and (pair? (car procedure-body)) 
+               (equal? 'define (caar procedure-body)))
+        (cons (car procedure-body)
+              (get-defines (cdr procedure-body)))
+        (get-defines (cdr procedure-body)))))
+  (define (get-rest procedure-body)
+    (if (null? procedure-body)
+      '()
+      (if (or (not (pair? (car procedure-body)))
+              (not (equal? 'define (caar procedure-body))))
+        (cons (car procedure-body)
+              (get-rest (cdr procedure-body)))
+        (get-rest (cdr procedure-body)))))
+  (define (create-list-of-assignments the-defines)
+    (map (lambda (x) (list (cadr x) '*unassigned*)) the-defines))
+  (define (create-list-of-sets! the-defines)
+    (map (lambda (x) (list 'set! (cadr x) (caddr x))) the-defines))
+  (if (not (pair? procedure-body))
+    procedure-body
+    (let ((the-defines (get-defines procedure-body))
+          (the-rest (get-rest procedure-body)))
+      (if (= 0 (length the-defines))
+        procedure-body ; don't need to scan out anything
+        (append '(let) (list (create-list-of-assignments the-defines))
+                (create-list-of-sets! the-defines)
+                the-rest))))) 
+
+
 
 
 
@@ -521,13 +568,16 @@
   (apply-in-underlying-scheme    ; apply-in-underlying-scheme
     (primitive-implementation proc) args))
 
-; input to system
-(define (its exp)
+; print input to system
+(define (pits exp)
   (if (eq? exp 'the-global-environment)
     (display the-global-environment)
-    (let ((output (eval exp the-global-environment)))
+    (let ((output (our-eval exp the-global-environment)))
       (user-print output)
       (newline))))
+
+(define (its exp)
+  (our-eval exp the-global-environment))
 
 (define (driver-loop)
   (newline)
@@ -539,13 +589,16 @@
     ; typing in "'(1 2 3)" results in a list sent
     (if (eq? input 'the-global-environment)
       (display the-global-environment)
-      (let ((output (eval input the-global-environment)))
+      (let ((output (our-eval input the-global-environment)))
         (newline)
         (user-print output))))
   (driver-loop))
 
 (define (user-print object)
   (cond ((compound-procedure? object)
+         ; why do we have this special condition for displaying procedures?
+         ; cause a procedure contains a pointer to an environment, so we'd get 
+         ; a big loop if we allowed plp to print the environment
          (plp (list 'procedure
                     (procedure-parameters object)
                     (procedure-body object))))

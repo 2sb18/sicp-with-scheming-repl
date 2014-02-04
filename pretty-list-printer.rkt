@@ -3,7 +3,9 @@
 (#%provide plp)
 
 (define (plp lst)
-  (print-lines (print-cons lst)))
+  (if (not (pair? lst))
+    (display lst)
+    (print-lines (print-cons lst))))
 
 (define (print-lines list-of-strings)
   (cond ((not (null? list-of-strings))
@@ -115,7 +117,8 @@
   (cond ((string? x) (string-append "\"" x "\""))
         ((symbol? x) (string-append "'" (symbol->string x)))
         ((null? x) "/")
-        ((number? x) (number->string x))))
+        ((number? x) (number->string x))
+        (else "#the#abyss#")))
 
 ; this procedure returns a list of strings, which is a picture of
 ; everything refered to by the-cons
