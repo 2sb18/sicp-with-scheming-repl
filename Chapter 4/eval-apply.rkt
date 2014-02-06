@@ -76,6 +76,7 @@
  plp
  scan-out-defines 
  procedure-body
+ user-print
  )
 
 
@@ -89,6 +90,8 @@
         ((compound-procedure? procedure)
          (eval-sequence
            (procedure-body procedure)
+           ; extend the environment with the arguments that
+           ; have been sent to the procedure
            (extend-environment
              (procedure-parameters procedure)
              arguments
@@ -162,13 +165,13 @@
 (define (eval-sequence exps env)
   (cond ((last-exp? exps) (our-eval (first-exp exps) env))
         (else (our-eval (first-exp exps) env)
-              (eval-sequence (rest-exps) env))))
+              (eval-sequence (rest-exps exps) env))))
 
-; set-variable-value puts the variable and value intto the
+; set-variable-value puts the variable and value into the
 ; designated environment
 (define (eval-assignment exp env)
   (set-variable-value! (assignment-variable exp)
-                       (eval (assignment-value exp) env)
+                       (our-eval (assignment-value exp) env)
                        env)
   'ok)
 
@@ -209,20 +212,23 @@
 ;                  = (let ((a 3) (b 4)) body)
 ; special form of let is (let var var-exp-list body) where body is binded
 ; to var, so that it can call itself
+
+; GOT RID OF THE SPECIAL FORM, SINCE WE CAN HAVE A BODY THAT IS A BUNCH OF ELEMENTS
+; LONG
 ;
 ; lets get turned into a application of a lambda
 (define (let->combination exp)
   ; if there's only three elements in the let, it's normal form
-  (if (= 3 (length exp))
-    (cons (make-lambda (get-vars-of-var-expression-list (cadr exp))
-                       (caddr exp))
-          (get-exprs-of-var-expression-list (cadr exp)))
-    ; we got the crazy special let form )
-    (make-begin (list 
-                  (cons 'define
-                        (cons (cons (cadr exp) (get-vars-of-var-expression-list (caddr exp)))
-                              (cdddr exp)))
-                  (cons (cadr exp) (get-exprs-of-var-expression-list (caddr exp)))))))
+  ; (if (= 3 (length exp))
+  (cons (make-lambda (get-vars-of-var-expression-list (cadr exp))
+                     (cddr exp))
+        (get-exprs-of-var-expression-list (cadr exp))))
+; we got the crazy special let form )
+; (make-begin (list 
+;               (cons 'define
+;                     (cons (cons (cadr exp) (get-vars-of-var-expression-list (caddr exp)))
+;                           (cdddr exp)))
+;               (cons (cadr exp) (get-exprs-of-var-expression-list (caddr exp)))))))
 
 (define (let*? exp) (tagged-list? exp 'let*))
 (define (let*->nested-lets exp)
@@ -274,13 +280,13 @@
   (tagged-list? exp 'make-unbound!))
 
 
-; a lambda expression looks like: '(lambda parameters body)
+; a lambda expression looks like: '(lambda parameters-list body-1 body-2 .. body-n)
 (define (lambda? exp) (tagged-list? exp 'lambda))
 (define (lambda-parameters exp) (cadr exp))
 (define (lambda-body exp) (cddr exp))
 
 (define (make-lambda parameters body)
-  (list 'lambda parameters body))
+  (cons 'lambda (cons parameters body)))
 
 ; will accept something like (if meow boo hoo)
 (define (if? exp) (tagged-list? exp 'if))
@@ -372,8 +378,7 @@
 ; parameters is a list of parameters
 ; body is a list structure
 (define (make-procedure parameters body env)
-  ; (list 'procedure parameters (scan-out-defines body) env))
-  (list 'procedure parameters body env))
+  (list 'procedure parameters (scan-out-defines body) env))
 (define (compound-procedure? p)
   (tagged-list? p 'procedure))
 (define (procedure-parameters p) (cadr p))
@@ -414,7 +419,8 @@
               (get-rest (cdr procedure-body)))
         (get-rest (cdr procedure-body)))))
   (define (create-list-of-assignments the-defines)
-    (map (lambda (x) (list (cadr x) '*unassigned*)) the-defines))
+    ; not sure if this double quote thing is cool
+    (map (lambda (x) (list (cadr x) ''*unassigned*)) the-defines))
   (define (create-list-of-sets! the-defines)
     (map (lambda (x) (list 'set! (cadr x) (caddr x))) the-defines))
   (if (not (pair? procedure-body))
@@ -423,9 +429,9 @@
           (the-rest (get-rest procedure-body)))
       (if (= 0 (length the-defines))
         procedure-body ; don't need to scan out anything
-        (append '(let) (list (create-list-of-assignments the-defines))
-                (create-list-of-sets! the-defines)
-                the-rest))))) 
+        (list (append '(let) (list (create-list-of-assignments the-defines))
+                      (create-list-of-sets! the-defines)
+                      the-rest))))))
 
 
 

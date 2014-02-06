@@ -22,7 +22,7 @@
 
 (run-and-check "(make-lambda 'parameters 'body)"
                (make-lambda 'parameters 'body)
-               '(lambda parameters body))
+               '(lambda parameters . body))
 
 (run-and-check "(make-procedure 'parameters 'body 'env)"
                (make-procedure 'parameters 'body 'env)
@@ -34,13 +34,9 @@
 (display "Next we'll scan out the defines of a body that is just '(x)\n")
 (run-and-check '(scan-out-defines '(x)) (scan-out-defines '(x)) '(x))
 
-(run-and-check "((lambda (x) x) 3)"
-               ((lambda (x) x) 3)
-               3)
+(its-and-check '((lambda (x) x) 3) 3)
 
-(run-and-check "(let ((a 3)) a)"
-               (let ((a 3)) a)
-               3)
+(its-and-check '(let ((a 3)) a) 3)
 
 (its-and-check '(let* ((a 3)) a) 3)
 
@@ -68,11 +64,55 @@
 (plp after-scan-out)
 (newline)
 
-(its-and-check '((lambda (x)
-                   (* x (meow x))
-                   (define (meow x)
-                     (* x x)))
-                 4)
-               64)
+(its-and-check '((lambda (x) x) 3) 3)
+
+(its-and-check '(define meow (lambda (x) x)) 'ok)
+(its-and-check '(meow 3) 3)
+
+(its-and-check '(define double-meow (lambda (x) 3 x)) 'ok)
+
+(its-and-check '(double-meow 4) 4)
+
+(its-and-check '(let ((a 0)) (set! a 3) a) 3)
+
+; (lambda <vars>
+;   (define u <e1>)
+;   (define v <e2>)
+;   <e3>)
+;
+; would be transformed into
+;
+; (lambda <vars>
+;   (let ((u '*unassigned*)
+;         (v '*unassigned*))
+;     (set! u <e1>)
+;     (set! v <e2>)
+;     <e3>))
+
+; here's what the transformation should look like
+(its-and-check '(define transformed (lambda (x) (let ((u '*unassigned*)) (set! u 3) (* x u)))) 'ok)
+(user-print (its 'transformed)) 
+(its-and-check '(transformed 4) 12)
+
+; here's what our transformation actually looks like
+(its-and-check '(define before (lambda (x) (define u 3) (* x u))) 'ok)
+(user-print (its 'before))
+(its-and-check '(before 4) 12)
+
+(its-and-check '(define scan-test (lambda (x) (* x u v) (define u 3) (define v 4))) 'ok)
+(its-and-check '(scan-test 2) 24)
+
+
+
+
+
+
+
+; (its-and-check '((lambda (x)
+;                    (* x (meow x))
+;                    (define (meow x)
+;                      (* x x)))
+;                  4)
+;                64)
 
 
