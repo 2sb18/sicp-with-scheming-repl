@@ -102,17 +102,67 @@
 (its-and-check '(define scan-test (lambda (x) (* x u v) (define u 3) (define v 4))) 'ok)
 (its-and-check '(scan-test 2) 24)
 
+; #####################
+; LETREC
+; #####################
+
+; THE REC IS FOR RECURSIVE!!!!!
+
+; let's check scan-out-defines:
+
+; (plp (scan-out-defines
+;        '(
+;          (define m 3)
+;          (* m 4))))
+
+; (its '(letrec ((meow 3) (hello 4)) (* 3 4)))
 
 
+; does this already work?
+; this ....
+; (its '(define (f x)
+;         (define (even? n)
+;           (if (= n 0)
+;             true
+;             (odd? (- n 1))))
+;         (define (odd? n)
+;           (if (= n 0)
+;             false
+;             (even? (- n 1))))
+;         (even? x)))
+;
+; (pits 'f)
+
+; (its '(f 5))
 
 
+; (its '(define (f x)
+;         (letrec ((even?
+;                    (lambda (n)
+;                      (if (= n 0)
+;                        true
+;                        (odd? (- n 1)))))
+;                  (odd?
+;                    (lambda (n)
+;                      (if (= n 0)
+;                        false
+;                        (even? (- n 1))))))
+;           (even? x))))
+;
+; (its '(f 5))
 
-
-; (its-and-check '((lambda (x)
-;                    (* x (meow x))
-;                    (define (meow x)
-;                      (* x x)))
-;                  4)
-;                64)
-
+;
+; ; should turn into this ...
+; (define (f x)
+;   (let ((times-2 'unassigned)
+;         (times-3 'unassigned))
+;     (set! times-2 (lambda (n) (* n 2)))
+;     (set! times-3 (lambda (n) (* n 3)))
+;     (times-2 (times-3 x))))
+;
+;
+; (define hello 3)
+;
+; (set! hello 3)
+;
 

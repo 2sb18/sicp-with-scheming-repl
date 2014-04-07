@@ -17,6 +17,7 @@
  let->combination
  let*?
  let*->nested-lets
+ letrec->let
  quoted?
  text-of-quotation
  tagged-list?
@@ -77,6 +78,9 @@
  scan-out-defines 
  procedure-body
  user-print
+ pits
+ let-and-set
+ letrec->let
  )
 
 
@@ -116,6 +120,7 @@
     ((make-unbound? exp) (eval-make-unbound? exp env))
     ((let? exp) (our-eval (let->combination exp) env))
     ((let*? exp) (our-eval (let*->nested-lets exp) env))
+    ((letrec? exp) (our-eval (letrec->let exp) env))
     ((if? exp) (eval-if exp env))
     ; an expression is lambda if it starts with 'lambda
     ((lambda? exp)
@@ -241,6 +246,11 @@
           (list 'let*
                 (cdadr exp)
                 (caddr exp)))))
+
+(define (letrec? exp) (tagged-list? exp 'letrec))
+
+(define (letrec->let exp)
+  (let-and-set (cadr exp) (cddr exp)))
 
 (define (quoted? exp)
   (tagged-list? exp 'quote))
@@ -378,7 +388,9 @@
 ; parameters is a list of parameters
 ; body is a list structure
 (define (make-procedure parameters body env)
+  ; !!! gotta put this back in
   (list 'procedure parameters (scan-out-defines body) env))
+; (list 'procedure parameters body env))
 (define (compound-procedure? p)
   (tagged-list? p 'procedure))
 (define (procedure-parameters p) (cadr p))
@@ -402,14 +414,14 @@
 ;     (set! v <e2>)
 ;     <e3>))
 (define (scan-out-defines procedure-body)
-  (define (get-defines procedure-body)
+  (define (get-bindings procedure-body)
     (if (null? procedure-body)
       '()
       (if (and (pair? (car procedure-body)) 
                (equal? 'define (caar procedure-body)))
-        (cons (car procedure-body)
-              (get-defines (cdr procedure-body)))
-        (get-defines (cdr procedure-body)))))
+        (cons (cdar procedure-body)
+              (get-bindings (cdr procedure-body)))
+        (get-bindings (cdr procedure-body)))))
   (define (get-rest procedure-body)
     (if (null? procedure-body)
       '()
@@ -418,24 +430,28 @@
         (cons (car procedure-body)
               (get-rest (cdr procedure-body)))
         (get-rest (cdr procedure-body)))))
-  (define (create-list-of-assignments the-defines)
-    ; not sure if this double quote thing is cool
-    (map (lambda (x) (list (cadr x) ''*unassigned*)) the-defines))
-  (define (create-list-of-sets! the-defines)
-    (map (lambda (x) (list 'set! (cadr x) (caddr x))) the-defines))
   (if (not (pair? procedure-body))
     procedure-body
-    (let ((the-defines (get-defines procedure-body))
+    (let ((the-bindings (get-bindings procedure-body))
           (the-rest (get-rest procedure-body)))
-      (if (= 0 (length the-defines))
+      (if (= 0 (length the-bindings))
         procedure-body ; don't need to scan out anything
-        (list (append '(let) (list (create-list-of-assignments the-defines))
-                      (create-list-of-sets! the-defines)
-                      the-rest))))))
+        ; the-bindings))))
+        (let-and-set the-bindings the-rest)))))
 
-
-
-
+; create a let and set expression
+; we send it a list of bindings. 
+; ex.  ((even? (lambda (n) yadda yadda)) (odd? (lambda (n) yadda badda)))
+; example of inner-expressions: ((even 4) (odd 5))
+(define (let-and-set bindings inner-expressions)
+  (define (create-list-of-assignments bindings)
+    ; not sure if this double quote thing is cool
+    (map (lambda (x) (list (car x) ''*unassigned*)) bindings))
+  (define (create-list-of-sets! bindings)
+    (map (lambda (x) (list 'set! (car x) (cadr x))) bindings))
+  (list (append '(let) (list (create-list-of-assignments bindings))
+                (create-list-of-sets! bindings)
+                inner-expressions)))
 
 ;;;;;;;;;
 ; OPERATIONS ON ENVIRONMENTS
