@@ -66,10 +66,10 @@
 
 (its-and-check '((lambda (x) x) 3) 3)
 
-(its-and-check '(define meow (lambda (x) x)) 'ok)
+(its '(define meow (lambda (x) x)))
 (its-and-check '(meow 3) 3)
 
-(its-and-check '(define double-meow (lambda (x) 3 x)) 'ok)
+(its '(define double-meow (lambda (x) 3 x)))
 
 (its-and-check '(double-meow 4) 4)
 
@@ -90,16 +90,16 @@
 ;     <e3>))
 
 ; here's what the transformation should look like
-(its-and-check '(define transformed (lambda (x) (let ((u '*unassigned*)) (set! u 3) (* x u)))) 'ok)
+(its '(define transformed (lambda (x) (let ((u '*unassigned*)) (set! u 3) (* x u)))))
 (user-print (its 'transformed)) 
 (its-and-check '(transformed 4) 12)
 
 ; here's what our transformation actually looks like
-(its-and-check '(define before (lambda (x) (define u 3) (* x u))) 'ok)
+(its '(define before (lambda (x) (define u 3) (* x u))))
 (user-print (its 'before))
 (its-and-check '(before 4) 12)
 
-(its-and-check '(define scan-test (lambda (x) (* x u v) (define u 3) (define v 4))) 'ok)
+(its '(define scan-test (lambda (x) (* x u v) (define u 3) (define v 4))))
 (its-and-check '(scan-test 2) 24)
 
 ; #####################

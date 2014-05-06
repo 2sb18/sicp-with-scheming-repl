@@ -4,3 +4,11 @@
 !_TAG_PROGRAM_NAME	Exuberant Ctags	//
 !_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
 !_TAG_PROGRAM_VERSION	5.8	//
+display_stream	javascript_streams/streams.js	/^function display_stream(s) {$/;"	f
+stream_car	javascript_streams/streams.js	/^function stream_car(stream) {$/;"	f
+stream_cdr	javascript_streams/streams.js	/^function stream_cdr(stream) {$/;"	f
+stream_enumerate_interval	javascript_streams/streams.js	/^function stream_enumerate_interval(low, high) {$/;"	f
+stream_for_each	javascript_streams/streams.js	/^function stream_for_each(proc, s) {$/;"	f
+stream_map	javascript_streams/streams.js	/^function stream_map(proc, s) {$/;"	f
+stream_ref	javascript_streams/streams.js	/^function stream_ref(s, n) {$/;"	f
+the_empty_stream	javascript_streams/streams.js	/^var the_empty_stream = {};$/;"	v

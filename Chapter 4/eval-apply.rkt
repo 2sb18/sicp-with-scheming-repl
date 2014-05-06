@@ -4,7 +4,6 @@
 
 (#%provide 
  our-eval
- list-of-values
  eval-if
  eval-sequence
  eval-assignment
@@ -46,77 +45,90 @@
 (define (apply-in-underlying-scheme procedure arguments)
   (apply procedure arguments))
 
-; arguments is a list of arguments
-(define (our-apply procedure arguments)
-  (cond ((tagged-list? procedure 'primitive)
-         (apply-primitive-procedure procedure arguments))
-        ((tagged-list? procedure 'procedure)
-         (eval-sequence
-           (caddr procedure)
-           ; extend the environment with the arguments that
-           ; have been sent to the procedure
-           (extend-environment
-             (cadr procedure)
-             arguments
-             ; this is the environment
-             (cadddr procedure))))
-        (else
-          (error
-            "Unkown procedure type -- APPLY" procedure))))
 
 ; the our-eval procedure takes an expression and the environment that it's to be
 ; executed in
 (define (our-eval exp env)
+  ((analyze exp) env))
+
+; analyze has to return a procedure that takes an environment variable
+; as an argument
+(define (analyze exp)
   (cond 
     ; self-evaluating?
-    ((number? exp) exp)
-    ((string? exp) exp)
-    ; variable? variables are represented by symbols
-    ((symbol? exp) (lookup-variable-value exp env))
+    ((number? exp) (lambda (env) exp))
+    ((string? exp) (lambda (env) exp))
+    ; variables are represented by symbols
+    ((symbol? exp) (lambda (env) (lookup-variable-value exp env))) ; good!
     ; get the text of the quotation
-    ((tagged-list? exp 'quote) (cadr exp))
-    ((tagged-list? exp 'set!) (eval-assignment exp env))
-    ((tagged-list? exp 'define) (eval-definition exp env))
-    ((tagged-list? exp 'make-unbound!) (unbind! (cadr exp) env))
-    ((tagged-list? exp 'let) (our-eval (let->combination exp) env))
-    ((tagged-list? exp 'let*) (our-eval (let*->nested-lets exp) env))
-    ((tagged-list? exp 'letrec) (our-eval (let-and-set (cadr exp) (cddr exp)) env))
-    ((tagged-list? exp 'if) (eval-if exp env))
+    ((tagged-list? exp 'quote) 
+     (let ((qval (cadr exp))) (lambda (env) qval)))
+    ((tagged-list? exp 'set!) (analyze-assignment exp))
+    ((tagged-list? exp 'define) (analyze-definition exp))
+    ((tagged-list? exp 'make-unbound!) 
+     (let ((variable-name (cadr exp)))
+       (lambda (env) (unbind! variable-name env))))
+    ((tagged-list? exp 'let) (analyze (let->combination exp)))
+    ((tagged-list? exp 'let*) (analyze (let*->nested-lets exp)))
+    ((tagged-list? exp 'letrec) (analyze (let-and-set (cadr exp) (cddr exp))))
+    ((tagged-list? exp 'if) (analyze-if exp))
     ; a lambda expression looks like: '(lambda parameters-list body-1 body-2 .. body-n)
-    ((tagged-list? exp 'lambda)
-     (make-procedure (cadr exp)
-                     (cddr exp)
-                     env))
+    ((tagged-list? exp 'lambda) (analyze-lambda exp))
+    ; (make-procedure (cadr exp)
+    ;                 (cddr exp)
+    ;                 env))
     ; begin is used to package a sequence of expressions into
     ; a single expression
-    ((tagged-list? exp 'while) (our-eval (while->if exp) env))
+    ((tagged-list? exp 'while) (analyze (while->if exp)))
     ((tagged-list? exp 'begin)
-     (eval-sequence (cdr exp) env))
+     (analyze-sequence (cdr exp)))
     ; turn cond expression into an if expression then evaluate again
-    ((tagged-list? exp 'cond) (our-eval (expand-clauses (cdr exp)) env))
-    ; now we want to see if it's an application, which is the same thring
+    ((tagged-list? exp 'cond) (analyze (expand-clauses (cdr exp))))
+    ; now we want to see if it's an application, which is the same thing
     ; as a function call
     ; this is the last thing, so maybe the operator is a procedural call
     ; an application is just (function a b ..) where a and b are arguments
     ; so what if this was send (meow (if a b c) d)?
     ((pair? exp)
-     (our-apply (our-eval (car exp) env)
-                (list-of-values (cdr exp) env)))
+     (analyze-application exp))
     (else
       (error "Unknown expression type -- EVAL" exp))))
 
-; I think exps is a list of the operands
-; so this turns a list of operands into a list of values
-;
-; left-to-right evaluator
-; this evaluates all the expressions in the list
-; exps is just the operands, so no-operands just checks to see if exps is null 
-(define (list-of-values exps env)
-  (if (null? exps)
-    '()
-    (let ((left (our-eval (car exps) env)))
-      (let ((right (list-of-values (cdr exps) env)))
-        (cons left right)))))
+; an application looks like (meow woof cat ... bat)
+; where meow could be an expression that returns a function
+; and woof cat ... bat are arguments for the application
+(define (analyze-application exp)
+  ; analyze all the elements of the expression
+  (let ((fproc (analyze (car exp)))
+        (aprocs (map analyze (cdr exp))))
+    (lambda (env)
+      (execute-application (fproc env)
+                           (map (lambda (aproc) (aproc env))
+                                aprocs)))))
+(define (execute-application proc args)
+  (cond ((tagged-list? proc 'primitive)
+         (apply-primitive-procedure proc args))
+        ((tagged-list? proc 'procedure)
+         ((caddr proc)
+          (extend-environment (cadr proc)
+                              args
+                              (cadddr proc))))
+        (else
+          (error
+            "Unknown procedure type -- EXECUTE-APPLICATION"
+            proc))))
+
+(define (analyze-if exp)
+  (let ((predicate-prod (analyze (cadr exp)))
+        (if-true-prod (analyze (caddr exp)))
+        (if-false-prod (analyze (if (not (null? (cdddr exp)))
+                                  (cadddr exp)
+                                  'false))))
+    (lambda (env)
+      (if (true? (predicate-prod env))
+        (if-true-prod env)
+        (if-false-prod env)))))
+
 
 ; exp looks like (if predicate do-if-true do-if-false)
 (define (eval-if exp env)
@@ -129,10 +141,35 @@
         'false)
       env)))
 
+; exps should just be a list of expressions
+(define (analyze-sequence exps)
+  ; this will return a procedure that runs proc1 and then proc2
+  (define (sequentially proc1 proc2)
+    (lambda (env) (proc1 env) (proc2 env)))
+  (define (loop first-proc rest-procs)
+    (if (null? rest-procs)
+      first-proc
+      (loop (sequentially first-proc (car rest-procs))
+            (cdr rest-procs))))
+  ; put each expression through our analyze function
+  (let ((procs (map analyze exps)))
+    (if (null? procs)
+      (error "Empty sequence -- ANALYZE"))
+    (loop (car procs) (cdr procs))))
+
 (define (eval-sequence exps env)
   (cond ((null? (cdr exps)) (our-eval (car exps) env))
         (else (our-eval (car exps) env)
               (eval-sequence (cdr exps) env))))
+
+; return a function that takes an environment as an argument
+(define (analyze-assignment exp)
+  (let ((variable-name (cadr exp))
+        (variable-proc (analyze (caddr exp))))
+    (lambda (env)
+      (set-variable-value! variable-name
+                           (variable-proc env)
+                           env))))
 
 ; set-variable-value puts the variable and value into the
 ; designated environment
@@ -142,6 +179,15 @@
                        (our-eval (caddr exp) env)
                        env)
   'ok)
+
+(define (analyze-definition exp)
+  (let ((definition-name (definition-variable exp))
+        (definition-procedure (analyze (definition-value exp))))
+    (lambda (env)
+      (define-variable! definition-name
+                        (definition-procedure env)
+                        env))))
+
 
 (define (eval-definition exp env)
   (define-variable! (definition-variable exp)
@@ -173,17 +219,9 @@
 ;                  = (let ((a 3) (b 4)) body)
 ; lets get turned into a application of a lambda
 (define (let->combination exp)
-  ; if there's only three elements in the let, it's normal form
-  ; (if (= 3 (length exp))
   (cons (make-lambda (get-vars-of-var-expression-list (cadr exp))
                      (cddr exp))
         (get-exprs-of-var-expression-list (cadr exp))))
-; we got the crazy special let form )
-; (make-begin (list 
-;               (cons 'define
-;                     (cons (cons (cadr exp) (get-vars-of-var-expression-list (caddr exp)))
-;                           (cdddr exp)))
-;               (cons (cadr exp) (get-exprs-of-var-expression-list (caddr exp)))))))
 
 (define (let*->nested-lets exp)
   ; if there's only one var-expression pair left, just turn the let* into a
@@ -264,6 +302,17 @@
 ;;;;;;;;;
 ; REPRESENTING PROCEDURES
 ;;;;;;;;;
+
+; parameters is (cadr exp), body is (cddr),
+(define (analyze-lambda exp)
+  (let ((new-body (analyze-sequence (scan-out-defines (cddr exp)))))
+    (lambda (env)
+      (list 'procedure (cadr exp) new-body env))))
+
+
+; (make-procedure (cadr exp)
+;                 (cddr exp)
+;                 env))
 
 ; right, each procedure points to an env
 ; parameters is a list of parameters
@@ -453,7 +502,7 @@
 (define the-global-environment (setup-environment))
 
 (define (apply-primitive-procedure proc args)
-  (apply-in-underlying-scheme    ; apply-in-underlying-scheme
+  (apply-in-underlying-scheme    
     (cadr proc) args))
 
 ; print input to system
@@ -464,6 +513,7 @@
       (user-print output)
       (newline))))
 
+; input to system
 (define (its exp)
   (our-eval exp the-global-environment))
 
