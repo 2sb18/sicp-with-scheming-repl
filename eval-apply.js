@@ -1,4 +1,10 @@
-/* exported evaluate */
+/* exported evaluate, qeval,  */
+// environment stuff
+/* exported set_variable_value, lookup_variable_value, extend_environment */
+/* exported define_variable, empty_environment */
+// eval stuff
+/* exported eval_if, eval_lamda */
+/* exported expressionToTree */
 
 /*
  * Evaluates an expression string in a specific environment
@@ -11,7 +17,7 @@
  *
  * @return the result of the expression execution
  */
-function evaluate(expressionTree) {
+function evaluate(expressionTree, env) {
   "use strict";
 
   // find out what kind of expression this is
@@ -23,36 +29,190 @@ function evaluate(expressionTree) {
     } else if (expressionTree === "false") {
       return false;
     } else {
-      return expressionTree;
+      var lookup = lookup_variable_value(expressionTree, env);
+      if (typeof lookup === "undefined") {
+        return expressionTree;
+      } else {
+        return lookup;
+      }
     }
   }
 
   // we know expressionTree is a list
   // but what kind of expression is it?
-  switch (evaluate(expressionTree[0])) {
+  switch (evaluate(expressionTree[0], env)) {
     case "if":
-      return eval_if(expressionTree.slice(1));
+      return eval_if(expressionTree.slice(1), env);
+    case "define":
+      return eval_define(expressionTree.slice(1), env);
+    case "lambda":
+      return eval_lambda(expressionTree.slice(1), env);
+
+      // primitives
+    case "*":
+      return eval_mult(expressionTree.slice(1), env);
+    case "/":
+      return eval_div(expressionTree.slice(1), env);
+    case "+":
+      return eval_add(expressionTree.slice(1), env);
+    case "-":
+      return eval_sub(expressionTree.slice(1), env);
+    case "=":
+      return eval_equals(expressionTree.slice(1), env);
+    default:
+      // application
+      return apply(expressionTree, env);
   }
 }
 
 // for quick-evaluate
 // always returns a string
-function qeval(expression) {
+function qeval(expression, env) {
   "use strict";
-  return evaluate(expressionToTree(expression)).toString();
+  var result = evaluate(expressionToTree(expression), env);
+  if (typeof result !== "undefined") {
+    return result.toString();
+  } else {
+    return undefined;
+  }
 }
 
-function eval_if(expressionTree) {
+function eval_mult(expressionTree, env) {
+  "use strict";
+  return evaluate(expressionTree[0], env) * evaluate(expressionTree[1], env);
+}
+
+function eval_div(expressionTree, env) {
+  "use strict";
+  return evaluate(expressionTree[0], env) / evaluate(expressionTree[1], env);
+}
+
+function eval_add(expressionTree, env) {
+  "use strict";
+  return evaluate(expressionTree[0], env) + evaluate(expressionTree[1], env);
+}
+
+function eval_sub(expressionTree, env) {
+  "use strict";
+  return evaluate(expressionTree[0], env) - evaluate(expressionTree[1], env);
+}
+
+function eval_equals(expressionTree, env) {
+  "use strict";
+  return evaluate(expressionTree[0], env) === evaluate(expressionTree[1], env);
+}
+
+// expressionTree should look like
+// (meow 3 4 7)
+function apply(expressionTree, env) {
+  "use strict";
+  // we gotta find the environment that the procedure points to
+  var procedure = lookup_variable_value(expressionTree[0], env);
+  // then extend that environment
+  var new_environment = extend_environment(procedure.env);
+  // and populate it
+  var i, j = 1;
+  for (i = 0; i < procedure.parameters.length; i++) {
+    define_variable(procedure.parameters[i], expressionTree[j++], new_environment);
+  }
+  return evaluate(procedure.code, new_environment);
+}
+
+function eval_if(expressionTree, env) {
   "use strict";
   // expressionTree should look like this...
   // (3 1 4)
-  if (evaluate(expressionTree[0])) {
-    return evaluate(expressionTree[1]);
+  if (evaluate(expressionTree[0], env)) {
+    return evaluate(expressionTree[1], env);
   } else if (expressionTree.length === 3) {
-    return evaluate(expressionTree[2]);
+    return evaluate(expressionTree[2], env);
   } else {
     return false;
   }
+}
+
+function eval_define(expressionTree, env) {
+  "use strict";
+  // expressionTree should look like this...
+  // (meow hello)
+  define_variable(evaluate(expressionTree[0], env),
+    evaluate(expressionTree[1], env), env);
+}
+
+// a procedure should look like this. it should be an object
+// procedure.parameters = [x, y, z, etc];
+// procedure.code = expressionTree of code
+// procedure.env points to the parent_frame
+function eval_lambda(expressionTree, env) {
+  "use strict";
+  // expression Tree should look like this...
+  // ((x y) (* x y))
+  var procedure = {};
+  procedure.parameters = expressionTree[0];
+  procedure.code = expressionTree[1];
+  procedure.env = env;
+  return procedure;
+}
+
+/*
+ * Our environment structure is like so...
+ * each frame in the environment is an object,
+ * with a parent_frame element which points to another
+ * frame, or is undefined if it's the top element.
+ * The frame also has a binding element, which is an
+ * array of variables in that frame
+ */
+
+/*
+ * We're assuming that env is already a well structured
+ * environment. ie it's an object that has a parent_frame element
+ * and a binding element
+ * @param variable: a string that is the variable name
+ *
+ * adds to the first frame in the environment
+ */
+function define_variable(variable, val, env) {
+  "use strict";
+  env.bindings[variable] = val;
+}
+
+/* find the variable in the environment and sets it.
+ * if variable can't be found, throws an error
+ */
+function set_variable_value(variable, val, env) {
+  "use strict";
+  if (typeof env.bindings[variable] !== "undefined") {
+    env.bindings[variable] = val;
+  } else if (typeof env.parent_frame === "undefined") {
+    throw "variable can't be found!";
+  } else {
+    set_variable_value(variable, val, env.parent_frame);
+  }
+}
+
+function lookup_variable_value(variable, env) {
+  "use strict";
+  if (typeof env.bindings[variable] !== "undefined") {
+    return env.bindings[variable];
+  } else if (typeof env.parent_frame === "undefined") {
+    return undefined;
+  } else {
+    return lookup_variable_value(variable, env.parent_frame);
+  }
+}
+
+// create an empty frame that extends the env sent to it
+function extend_environment(env) {
+  "use strict";
+  var new_env = {};
+  new_env.parent_frame = env;
+  new_env.bindings = [];
+  return new_env;
+}
+
+function empty_environment() {
+  "use strict";
+  return extend_environment(undefined);
 }
 
 
@@ -75,7 +235,8 @@ function expressionToTree(exp) {
       break;
     } else if (exp[i] === " ") {
       //do nothing
-    } else {
+      // (ignoring cause of empty block above)
+    } else { // jshint ignore:line 
       if (-1 !== exp.search(/\(|\)/)) {
         throw "expression that didn't start with ( has either ( or ) in it";
       }

@@ -15,10 +15,15 @@
   <script>
     function addParagraphToOutput(string) {
       $("#output").append("<p>" + string + "</p>");
+      $(window).scrollTop($(document).height());
     }
 
+     // if input string is undefined, return an empty string
     function convertToHTMLCode(string) {
       var stringToReturn = "";
+      if (typeof string === "undefined") {
+        return "";
+      }
       for (var i = 0; i < string.length; i++) {
         switch (string[i]) {
           case " ":
@@ -48,10 +53,12 @@
       $("#input").html("> " + convertToHTMLCode(currentLine) + blinker);
     }
 
+    var global_env = empty_environment();
+
     $(document).keypress(function(e) {
       if (e.charCode === 13) { // enter
         addParagraphToOutput("> " + convertToHTMLCode(currentLine));
-        addParagraphToOutput(convertToHTMLCode(qeval(currentLine)));
+        addParagraphToOutput(convertToHTMLCode(qeval(currentLine, global_env)));
         currentLine = "";
         updateCurrentLine();
       } else if (e.charCode === 10) { // ctrl-enter
