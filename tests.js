@@ -76,5 +76,7 @@ test("lambdas", function() {
   qeval("(define meow (lambda (x) x))", env);
   equal(qeval("(meow 3)", env), 3,
     "defining meow as (lambda (x) x), evaluating (meow 3) results in 3");
-  // qeval("(define factorial (lambda (x) (if 
+  qeval("(define factorial (lambda (x) (if (= x 1) 1 (* x (factorial (- x 1))))))", env);
+  equal(qeval("(factorial 10)", env), 3628800,
+    "recursive functions work, (factorial 10) results in 3628800");
 });

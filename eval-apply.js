@@ -69,6 +69,9 @@ function evaluate(expressionTree, env) {
 // always returns a string
 function qeval(expression, env) {
   "use strict";
+  if (typeof env === "undefined") {
+    throw "called qeval(...) without sending an environment argument";
+  }
   var result = evaluate(expressionToTree(expression), env);
   if (typeof result !== "undefined") {
     return result.toString();
@@ -113,7 +116,8 @@ function apply(expressionTree, env) {
   // and populate it
   var i, j = 1;
   for (i = 0; i < procedure.parameters.length; i++) {
-    define_variable(procedure.parameters[i], expressionTree[j++], new_environment);
+    //                                   should this be new_environment? ---V 
+    define_variable(procedure.parameters[i], evaluate(expressionTree[j++], env), new_environment);
   }
   return evaluate(procedure.code, new_environment);
 }
