@@ -1,10 +1,34 @@
 /* global test, equal, deepEqual, throws */
-/* global expressionToTree, qeval */
+/* global convertTreeObjIntoTreeArray, expressionToTree, qeval */
 /* global extend_environment, define_variable, lookup_variable_value, empty_environment */
 /* global set_variable_value */
 /* jshint globalstrict:true */
 //
 "use strict";
+
+test("convertTreeObjIntoTreeArray", function() {
+  deepEqual(convertTreeObjIntoTreeArray({
+      array: []
+    }), [],
+    "convertTreeObjIntoTreeArray({array:[]}) returns []");
+  deepEqual(convertTreeObjIntoTreeArray({
+      array: ["hello", "meow"]
+    }), ["hello", "meow"],
+    "convertTreeObjIntoTreeArray({array:['hello', 'meow']}) returns ['hello', 'meow']");
+  deepEqual(convertTreeObjIntoTreeArray({
+      array: [{
+        array: ["hello", "meow"],
+      }, {
+        array: ["woof", {
+          array: []
+        }, "chewy"]
+      }]
+    }), [
+      ["hello", "meow"],
+      ["woof", [], "chewy"]
+    ],
+    "convertTreeObjIntoTreeArray deals with multi nested arrays");
+});
 
 test("expressionToTree", function() {
   throws(function() {
@@ -79,4 +103,11 @@ test("lambdas", function() {
   qeval("(define factorial (lambda (x) (if (= x 1) 1 (* x (factorial (- x 1))))))", env);
   equal(qeval("(factorial 10)", env), 3628800,
     "recursive functions work, (factorial 10) results in 3628800");
+});
+
+test("defining lambda shortcut", function() {
+  var env = empty_environment();
+  qeval("(define (meow x) (* x 2))", env);
+  equal(qeval("(meow 3)", env), 6,
+    "Using the shortcut (define (meow x) (* x 2)) and then evaluating (meow 3) results in 6");
 });

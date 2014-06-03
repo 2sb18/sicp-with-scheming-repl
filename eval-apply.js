@@ -44,9 +44,9 @@ function evaluate(expressionTree, env) {
     case "if":
       return eval_if(expressionTree.slice(1), env);
     case "define":
-      return eval_define(expressionTree.slice(1), env);
+      return eval_define(expressionTree.slice(0), env);
     case "lambda":
-      return eval_lambda(expressionTree.slice(1), env);
+      return eval_lambda(expressionTree.slice(0), env);
 
       // primitives
     case "*":
@@ -105,21 +105,27 @@ function eval_equals(expressionTree, env) {
   return evaluate(expressionTree[0], env) === evaluate(expressionTree[1], env);
 }
 
-// expressionTree should look like
-// (meow 3 4 7)
 function apply(expressionTree, env) {
   "use strict";
+  // if expressionTree looks like this: (meow 3 4 7)
+  //
   // we gotta find the environment that the procedure points to
-  var procedure = lookup_variable_value(expressionTree[0], env);
-  // then extend that environment
-  var new_environment = extend_environment(procedure.env);
-  // and populate it
-  var i, j = 1;
-  for (i = 0; i < procedure.parameters.length; i++) {
-    //                                   should this be new_environment? ---V 
-    define_variable(procedure.parameters[i], evaluate(expressionTree[j++], env), new_environment);
+  if (typeof expressionTree[0] !== "object") {
+    var procedure = lookup_variable_value(expressionTree[0], env);
+    // then extend that environment
+    var new_environment = extend_environment(procedure.env);
+    // and populate it
+    var i, j = 1;
+    for (i = 0; i < procedure.parameters.length; i++) {
+      //                                   should this be new_environment? ---V 
+      define_variable(procedure.parameters[i], evaluate(expressionTree[j++], env), new_environment);
+    }
+    return evaluate(procedure.code, new_environment);
+  } else {
+    // we're looking at something like
+    // ((lambda (x) (* 2 x)) 3)
   }
-  return evaluate(procedure.code, new_environment);
+
 }
 
 function eval_if(expressionTree, env) {
@@ -138,10 +144,26 @@ function eval_if(expressionTree, env) {
 function eval_define(expressionTree, env) {
   "use strict";
   // expressionTree should look like this...
-  // (meow hello)
-  define_variable(evaluate(expressionTree[0], env),
-    evaluate(expressionTree[1], env), env);
+  // (define variable_name variable_value)
+  if (typeof expressionTree[1] !== "object") {
+    // do we need to evaluate the variable name in a define?
+    define_variable(evaluate(expressionTree[1], env),
+      evaluate(expressionTree[2], env), env);
+  } else {
+    // or this...
+    // (define (function_name param1 param2) (* 2 x))
+    // which we need to transform into this
+    // (define function_name (lambda (param1 param2) (* 2 x)))
+
+    // first, create the lambda
+    var lamb = ["lambda"];
+    lamb.push(expressionTree[1].slice(1));
+    lamb.push(expressionTree[2]);
+    define_variable(evaluate(expressionTree[1][0], env),
+      evaluate(lamb, env), env);
+  }
 }
+
 
 // a procedure should look like this. it should be an object
 // procedure.parameters = [x, y, z, etc];
@@ -150,10 +172,10 @@ function eval_define(expressionTree, env) {
 function eval_lambda(expressionTree, env) {
   "use strict";
   // expression Tree should look like this...
-  // ((x y) (* x y))
+  // (lambda (x y) (* x y))
   var procedure = {};
-  procedure.parameters = expressionTree[0];
-  procedure.code = expressionTree[1];
+  procedure.parameters = expressionTree[1];
+  procedure.code = expressionTree[2];
   procedure.env = env;
   return procedure;
 }
@@ -219,6 +241,30 @@ function empty_environment() {
   return extend_environment(undefined);
 }
 
+// all the nodes in the tree look like this:
+// obj = { array: [ obj1, obj2 ] }
+//
+// turn into a tree of arrays, ie get rid of
+// the object part
+//
+// so...
+// array = [ array1, array2]
+function convertTreeObjIntoTreeArray(top_obj) {
+  "use strict";
+  var array_to_return = [];
+  if (typeof top_obj.array === "undefined") {
+    return top_obj;
+  }
+  top_obj.array.forEach(function(element) {
+    if (typeof element === "object") {
+      array_to_return.push(convertTreeObjIntoTreeArray(element));
+    } else {
+      array_to_return.push(element);
+    }
+  });
+  return array_to_return;
+}
+
 
 /*
  * Turns an expression into an array tree
@@ -226,90 +272,106 @@ function empty_environment() {
  * @param  exp a string that represents the input expression
  *
  * @return an array tree representing the expression
+ *
  */
 function expressionToTree(exp) {
   "use strict";
 
-  // get rid of spaces on the front of the expression
-  var i = 0;
+  // slightly modify the exp
+  // exp is wrapped in array so it's easy to mutate it.
+  // this is because arrays are passed by reference.
+  exp = [exp];
 
-  while (1) {
-    if (exp[i] === "(") {
-      // we're dealing with a list
-      break;
-    } else if (exp[i] === " ") {
-      //do nothing
-      // (ignoring cause of empty block above)
-    } else { // jshint ignore:line 
-      if (-1 !== exp.search(/\(|\)/)) {
-        throw "expression that didn't start with ( has either ( or ) in it";
-      }
-      return exp.slice(i);
-    }
-    i++;
+  function lop_one_char() {
+    exp = [exp[0].slice(1)];
   }
 
-  // at this point, we know we're dealing with a list
-  var array_to_return = [];
-  var start;
+  // removes the string from exp and returns it
+
+  function consume_string_and_return_it() {
+    // the first character is ", so we know the string starts at 1
+    // must find end of string
+    var end = exp[0].indexOf("\"", 1);
+    var string = exp[0].slice(0, end + 1);
+    exp = [exp[0].slice(end + 1)];
+    return string;
+  }
+
+  function consume_symbol_and_return_it() {
+    // the first character is ", so we know the string starts at 1
+    // must find end of string
+    var string;
+    var end = exp[0].substr(1).search(/[ \(\)\"]/);
+    if (end === -1) {
+      string = exp[0];
+      exp = [""];
+      return string;
+    }
+    string = exp[0].slice(0, end + 1);
+    exp = [exp[0].slice(end + 1)];
+    return string;
+  }
+
   var level = 0;
-  var state = "in_between";
 
+  // downside to how this works: there are a lot of nested
+  // calls to expToTree. Worse case: there's a call for
+  // every character. May lead to stack overflow?
 
-  // at this point, we know we're dealing with a list
-  for (i++; i < exp.length; i++) {
-    switch (state) {
-      case "in_between":
-        switch (exp[i]) {
-          case "(":
-            start = i;
-            state = "in_list";
-            break;
-          case ")":
-            return array_to_return;
-          case " ":
-            break;
-          default:
-            start = i;
-            state = "in_token";
-        }
+  // parent_obj looks like parent_obj = { array };
+
+  function expToTree(parent_obj) {
+    if (typeof parent_obj === "undefined" || typeof parent_obj.array !== "object") {
+      throw "parent_obj is not formatted correctly";
+    }
+
+    if (exp[0].length === 0) {
+      // we're done!
+      return;
+    }
+
+    switch (exp[0][0]) {
+      case " ":
+        // get rid of spaces outside of strings
+        lop_one_char();
+        expToTree(parent_obj);
         break;
-      case "in_token":
-        switch (exp[i]) {
-          case ")":
-            array_to_return.push(exp.slice(start, i));
-            return array_to_return;
-          case " ":
-            array_to_return.push(exp.slice(start, i));
-            state = "in_between";
-            break;
-          case "(":
-            array_to_return.push(exp.slice(start, i));
-            start = i;
-            state = "in_list";
-            break;
-        }
+      case "\"": // it's a string!
+        parent_obj.array.push(consume_string_and_return_it());
+        expToTree(parent_obj);
         break;
-      case "in_list":
-        switch (exp[i]) {
-          case "(":
-            level++;
-            break;
-          case ")":
-            if (level === 0) {
-              array_to_return.push(expressionToTree(exp.slice(start, i + 1)));
-              state = "in_between";
-            } else if (level > 0) {
-              level--;
-            } else {
-              throw "misformed list";
-            }
-            break;
-        }
+      case "(": // it's the start of a list
+        level++;
+        lop_one_char();
+        var new_obj = {
+          array: []
+        };
+        parent_obj.array.push(new_obj);
+        expToTree(new_obj); // this should take care of whole list
+        expToTree(parent_obj); // now let's get back to the parent
         break;
-      default:
-        throw "in a weird state";
+      case ")": // it's the end of the list
+        level--;
+        lop_one_char();
+        break;
+      default: // if it's anything else, take it as a symbol
+        parent_obj.array.push(consume_symbol_and_return_it());
+        expToTree(parent_obj);
     }
   }
-  throw "misformed list";
+
+  var top_obj = {
+    array: []
+  };
+  expToTree(top_obj);
+  if (level !== 0) {
+    throw "malformed list: unclosed brackets";
+  }
+  return convertTreeObjIntoTreeArray(top_obj.array[0]);
 }
+
+/*************
+ * we have to deal with array manipulations alot. here's how to do them:
+ * concatenation: array1.concat(array2, value3, so on...)
+ * sliceofarray: array1.slice(start, end); //end not needed, negative values can be used
+ */
