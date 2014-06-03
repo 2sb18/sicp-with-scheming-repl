@@ -124,5 +124,12 @@ test("overwriting definitions", function() {
   qeval("(define (cow x) (+ x 1))", env);
   qeval("(define (cow x) (+ x 2))", env);
   equal(qeval("(cow 2)", env), 4,
-    "Overwriting happens when a variable is defined with the same name as an old name");
+    "Overwriting happens when a procedure is defined with the same name as an old name");
 });
+
+test("anonymous procedures", function() {
+  var env = empty_environment();
+  equal(qeval("((lambda (x) (* x x)) 3)", env), 9,
+    "Evaluating ((lambda (x) (* x x)) 3) results in 9");
+});
+

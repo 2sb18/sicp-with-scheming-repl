@@ -107,25 +107,31 @@ function eval_equals(expressionTree, env) {
 
 function apply(expressionTree, env) {
   "use strict";
+  var procedure, new_environment;
   // if expressionTree looks like this: (meow 3 4 7)
   //
   // we gotta find the environment that the procedure points to
   if (typeof expressionTree[0] !== "object") {
-    var procedure = lookup_variable_value(expressionTree[0], env);
-    // then extend that environment
-    var new_environment = extend_environment(procedure.env);
-    // and populate it
-    var i, j = 1;
-    for (i = 0; i < procedure.parameters.length; i++) {
-      //                                   should this be new_environment? ---V 
-      define_variable(procedure.parameters[i], evaluate(expressionTree[j++], env), new_environment);
-    }
-    return evaluate(procedure.code, new_environment);
+    procedure = lookup_variable_value(expressionTree[0], env);
   } else {
     // we're looking at something like
     // ((lambda (x) (* 2 x)) 3)
+    // this is an anonymous procedure
+    procedure = evaluate(expressionTree[0], env);
+    if (!is_procedure(procedure)) {
+      throw "anonymous procedure is not a procedure!";
+    }
   }
 
+  // then extend that environment
+  new_environment = extend_environment(procedure.env);
+  // and populate it
+  var i, j = 1;
+  for (i = 0; i < procedure.parameters.length; i++) {
+    //                                   should this be new_environment? ---V 
+    define_variable(procedure.parameters[i], evaluate(expressionTree[j++], env), new_environment);
+  }
+  return evaluate(procedure.code, new_environment);
 }
 
 function eval_if(expressionTree, env) {
@@ -181,6 +187,18 @@ function eval_lambda(expressionTree, env) {
   procedure.env = env;
   return procedure;
 }
+
+// x is a procedure if it is an object with
+// parameters, code, and env members
+function is_procedure(x) {
+  "use strict";
+  if (typeof x === "undefined" || typeof x.parameters === "undefined" ||
+    typeof x.code === "undefined" || typeof x.env === "undefined") {
+    return false;
+  }
+  return true;
+}
+
 
 /*
  * Our environment structure is like so...
