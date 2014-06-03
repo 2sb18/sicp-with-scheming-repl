@@ -131,8 +131,18 @@ function apply(expressionTree, env) {
     //                                   should this be new_environment? ---V 
     define_variable(procedure.parameters[i], evaluate(expressionTree[j++], env), new_environment);
   }
-  return evaluate(procedure.code, new_environment);
+  return eval_sequence(procedure.code, new_environment);
 }
+
+function eval_sequence(sequence_of_expressionTrees, env) {
+  "use strict";
+  if (sequence_of_expressionTrees.length === 1) {
+    return evaluate(sequence_of_expressionTrees[0], env);
+  }
+  evaluate(sequence_of_expressionTrees[0], env);
+  return eval_sequence(sequence_of_expressionTrees.slice(1), env);
+}
+
 
 function eval_if(expressionTree, env) {
   "use strict";
@@ -155,6 +165,11 @@ function eval_define(expressionTree, env) {
     // do we need to evaluate the variable name in a define?
     // the racket documentation says the variable name must
     // be an identifier, so I don't think so....
+    //
+    // make sure there's only one expression
+    if (expressionTree.length !== 3) {
+      throw "there should be a single expression after an identifier in a define";
+    }
     define_variable(expressionTree[1],
       evaluate(expressionTree[2], env), env);
   } else {
@@ -166,7 +181,7 @@ function eval_define(expressionTree, env) {
     // first, create the lambda
     var lamb = ["lambda"];
     lamb.push(expressionTree[1].slice(1));
-    lamb.push(expressionTree[2]);
+    lamb = lamb.concat(expressionTree.slice(2));
     define_variable(expressionTree[1][0],
       evaluate(lamb, env), env);
   }
@@ -175,15 +190,17 @@ function eval_define(expressionTree, env) {
 
 // a procedure should look like this. it should be an object
 // procedure.parameters = [x, y, z, etc];
-// procedure.code = expressionTree of code
+// procedure.code = an array of expressionTrees
 // procedure.env points to the parent_frame
 function eval_lambda(expressionTree, env) {
   "use strict";
   // expression Tree should look like this...
   // (lambda (x y) (* x y))
+  // or this
+  // (lambda (x y) (expression 1) (expression 2) ... (expression n))
   var procedure = {};
   procedure.parameters = expressionTree[1];
-  procedure.code = expressionTree[2];
+  procedure.code = expressionTree.slice(2);
   procedure.env = env;
   return procedure;
 }
@@ -394,4 +411,5 @@ function expressionToTree(exp) {
  * we have to deal with array manipulations alot. here's how to do them:
  * concatenation: array1.concat(array2, value3, so on...)
  * sliceofarray: array1.slice(start, end); //end not needed, negative values can be used
+ * NOTE: these return new arrays, they don't mess with originals
  */

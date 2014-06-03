@@ -1,6 +1,7 @@
 /* global test, equal, deepEqual, throws */
 /* global convertTreeObjIntoTreeArray, expressionToTree, qeval */
 /* global extend_environment, define_variable, lookup_variable_value, empty_environment */
+/* global eval_lambda */
 /* global set_variable_value */
 /* jshint globalstrict:true */
 //
@@ -100,6 +101,16 @@ test("primitives", function() {
 
 test("lambdas", function() {
   var env = empty_environment();
+  var lambda_exp = ["lambda", ["x"],
+    ["*", "x", "3"],
+    ["+", "1", "2"]
+  ];
+  var lambda_procedure = eval_lambda(lambda_exp, env);
+  deepEqual(lambda_procedure.code, [
+      ["*", "x", "3"],
+      ["+", "1", "2"]
+    ],
+    "procedure code is an array of expressionTrees");
   qeval("(define meow (lambda (x) x))", env);
   equal(qeval("(meow 3)", env), 3,
     "defining meow as (lambda (x) x), evaluating (meow 3) results in 3");
@@ -133,3 +144,9 @@ test("anonymous procedures", function() {
     "Evaluating ((lambda (x) (* x x)) 3) results in 9");
 });
 
+test("more than one expression in a procedure", function() {
+  var env = empty_environment();
+  qeval("(define (meow x) (define cat 4) (* x cat))", env);
+  equal(qeval("(meow 3)", env), 12,
+    "Sequences of expressions in procedures are evaluated sequentially");
+});
