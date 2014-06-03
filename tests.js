@@ -79,6 +79,9 @@ test("environment-stuff", function() {
   define_variable("a", "woof", env_1);
   equal(lookup_variable_value("a", env_3), "woof",
     "set_variable_value correctly sets variables");
+  define_variable("a", "glass", env_1);
+  equal(lookup_variable_value("a", env_3), "glass",
+    "set_variable_value correctly overwrites old values");
 });
 
 test("primitives", function() {
@@ -110,4 +113,16 @@ test("defining lambda shortcut", function() {
   qeval("(define (meow x) (* x 2))", env);
   equal(qeval("(meow 3)", env), 6,
     "Using the shortcut (define (meow x) (* x 2)) and then evaluating (meow 3) results in 6");
+});
+
+test("overwriting definitions", function() {
+  var env = empty_environment();
+  qeval("(define meow 3)", env);
+  qeval("(define meow 4)", env);
+  equal(qeval("meow", env), 4,
+    "Overwriting happens when a variable is defined with the same name as an old name");
+  qeval("(define (cow x) (+ x 1))", env);
+  qeval("(define (cow x) (+ x 2))", env);
+  equal(qeval("(cow 2)", env), 4,
+    "Overwriting happens when a variable is defined with the same name as an old name");
 });

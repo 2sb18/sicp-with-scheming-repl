@@ -147,7 +147,9 @@ function eval_define(expressionTree, env) {
   // (define variable_name variable_value)
   if (typeof expressionTree[1] !== "object") {
     // do we need to evaluate the variable name in a define?
-    define_variable(evaluate(expressionTree[1], env),
+    // the racket documentation says the variable name must
+    // be an identifier, so I don't think so....
+    define_variable(expressionTree[1],
       evaluate(expressionTree[2], env), env);
   } else {
     // or this...
@@ -159,7 +161,7 @@ function eval_define(expressionTree, env) {
     var lamb = ["lambda"];
     lamb.push(expressionTree[1].slice(1));
     lamb.push(expressionTree[2]);
-    define_variable(evaluate(expressionTree[1][0], env),
+    define_variable(expressionTree[1][0],
       evaluate(lamb, env), env);
   }
 }
