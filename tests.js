@@ -150,3 +150,9 @@ test("more than one expression in a procedure", function() {
   equal(qeval("(meow 3)", env), 12,
     "Sequences of expressions in procedures are evaluated sequentially");
 });
+
+test("y operator", function() {
+  var env = empty_environment();
+  equal(qeval("((lambda (n) ((lambda (fact) (fact fact n)) (lambda (ft k) (if (= k 1) 1 (* k (ft ft (- k 1))))))) 4)", env), 24,
+    "the y operator can be used to calculate factorials");
+});
