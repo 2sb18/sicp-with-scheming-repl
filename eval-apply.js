@@ -6,6 +6,7 @@
 /* exported eval_if, eval_lamda */
 /* exported expressionToTree */
 
+
 /*
  * Evaluates an expression string in a specific environment
  *
@@ -17,51 +18,77 @@
  *
  * @return the result of the expression execution
  */
+/* To evaluate, first we do a syntactic analysis
+ *
+ */
 function evaluate(expressionTree, env) {
   "use strict";
+  // analyze returns an analyzed procedure, which takes
+  // an env as it's only argument
+  return analyze(expressionTree)(env);
+}
 
-  // find out what kind of expression this is
+// returns a function that takes an environment
+function analyze(expressionTree) {
+  "use strict";
+  if (typeof expressionTree === "number") {
+    return function() {
+      return expressionTree;
+    };
+  }
+
   if (typeof expressionTree === "string") {
     if (!isNaN(parseFloat(expressionTree))) {
-      return parseFloat(expressionTree);
+      var number = parseFloat(expressionTree);
+      return function() {
+        return number;
+      };
     } else if (expressionTree === "true") {
-      return true;
+      return function() {
+        return true;
+      };
     } else if (expressionTree === "false") {
-      return false;
+      return function() {
+        return false;
+      };
     } else {
-      var lookup = lookup_variable_value(expressionTree, env);
-      if (typeof lookup === "undefined") {
-        return expressionTree;
-      } else {
-        return lookup;
-      }
+      // !!! we should have an else if for string strings, and
+      // we should also have it throw an error if a symbol isn't found
+      return function(env) {
+        var lookup = lookup_variable_value(expressionTree, env);
+        if (typeof lookup === "undefined") {
+          return expressionTree;
+        } else {
+          return lookup;
+        }
+      };
     }
   }
 
   // we know expressionTree is a list
   // but what kind of expression is it?
-  switch (evaluate(expressionTree[0], env)) {
+  switch (expressionTree[0]) {
     case "if":
-      return eval_if(expressionTree.slice(1), env);
+      return analyze_if(expressionTree);
     case "define":
-      return eval_define(expressionTree.slice(0), env);
+      return analyze_define(expressionTree);
     case "lambda":
-      return eval_lambda(expressionTree.slice(0), env);
+      return analyze_lambda(expressionTree);
 
       // primitives
     case "*":
-      return eval_mult(expressionTree.slice(1), env);
+      return analyze_mult(expressionTree);
     case "/":
-      return eval_div(expressionTree.slice(1), env);
+      return analyze_div(expressionTree);
     case "+":
-      return eval_add(expressionTree.slice(1), env);
+      return analyze_add(expressionTree);
     case "-":
-      return eval_sub(expressionTree.slice(1), env);
+      return analyze_sub(expressionTree);
     case "=":
-      return eval_equals(expressionTree.slice(1), env);
+      return analyze_equals(expressionTree);
     default:
       // application
-      return apply(expressionTree, env);
+      return analyze_apply(expressionTree);
   }
 }
 
@@ -80,85 +107,139 @@ function qeval(expression, env) {
   }
 }
 
-function eval_mult(expressionTree, env) {
+function analyze_mult(expressionTree) {
   "use strict";
-  return evaluate(expressionTree[0], env) * evaluate(expressionTree[1], env);
+  // expressionTree looks like (* 3 4)
+  var first = analyze(expressionTree[1]);
+  var second = analyze(expressionTree[2]);
+  return function(env) {
+    return first(env) * second(env);
+  };
 }
 
-function eval_div(expressionTree, env) {
+function analyze_div(expressionTree) {
   "use strict";
-  return evaluate(expressionTree[0], env) / evaluate(expressionTree[1], env);
+  // expressionTree looks like (/ 3 4)
+  var first = analyze(expressionTree[1]);
+  var second = analyze(expressionTree[2]);
+  return function(env) {
+    return first(env) / second(env);
+  };
 }
 
-function eval_add(expressionTree, env) {
+function analyze_add(expressionTree) {
   "use strict";
-  return evaluate(expressionTree[0], env) + evaluate(expressionTree[1], env);
+  // expressionTree looks like (+ 3 4)
+  var first = analyze(expressionTree[1]);
+  var second = analyze(expressionTree[2]);
+  return function(env) {
+    return first(env) + second(env);
+  };
 }
 
-function eval_sub(expressionTree, env) {
+function analyze_sub(expressionTree) {
   "use strict";
-  return evaluate(expressionTree[0], env) - evaluate(expressionTree[1], env);
+  // expressionTree looks like (- 3 4)
+  var first = analyze(expressionTree[1]);
+  var second = analyze(expressionTree[2]);
+  return function(env) {
+    return first(env) - second(env);
+  };
 }
 
-function eval_equals(expressionTree, env) {
+function analyze_equals(expressionTree) {
   "use strict";
-  return evaluate(expressionTree[0], env) === evaluate(expressionTree[1], env);
+  // expressionTree looks like (= 3 4)
+  var first = analyze(expressionTree[1]);
+  var second = analyze(expressionTree[2]);
+  return function(env) {
+    return first(env) === second(env);
+  };
 }
 
-function apply(expressionTree, env) {
+function analyze_apply(expressionTree) {
   "use strict";
   var procedure, new_environment;
-  // if expressionTree looks like this: (meow 3 4 7)
-  //
-  // we gotta find the environment that the procedure points to
-  if (typeof expressionTree[0] !== "object") {
-    procedure = lookup_variable_value(expressionTree[0], env);
-  } else {
-    // we're looking at something like
-    // ((lambda (x) (* 2 x)) 3)
-    // this is an anonymous procedure
-    procedure = evaluate(expressionTree[0], env);
-    if (!is_procedure(procedure)) {
-      throw "anonymous procedure is not a procedure!";
+  var analyzed_arguments = [];
+
+  // analyze the arguments
+  for (var j = 1; j < expressionTree.length; j++) {
+    analyzed_arguments.push(analyze(expressionTree[j]));
+  }
+
+  return function(env) {
+    // if expressionTree looks like this: (meow 3 4 7)
+    //
+    // we gotta find the environment that the procedure points to
+    if (typeof expressionTree[0] !== "object") {
+      procedure = lookup_variable_value(expressionTree[0], env);
+    } else {
+      // we're looking at something like
+      // ((lambda (x) (* 2 x)) 3)
+      // this is an anonymous procedure
+      procedure = evaluate(expressionTree[0], env);
+      if (!is_procedure(procedure)) {
+        throw "anonymous procedure is not a procedure!";
+      }
     }
-  }
 
-  // then extend that environment
-  new_environment = extend_environment(procedure.env);
-  // and populate it
-  var i, j = 1;
-  for (i = 0; i < procedure.parameters.length; i++) {
-    //                                   should this be new_environment? ---V 
-    define_variable(procedure.parameters[i], evaluate(expressionTree[j++], env), new_environment);
-  }
-  return eval_sequence(procedure.code, new_environment);
+    // then extend that environment
+    new_environment = extend_environment(procedure.env);
+    // and populate it
+    for (var i = 0; i < procedure.parameters.length; i++) {
+      //                           should this be new_environment? ---V 
+      define_variable(procedure.parameters[i], analyzed_arguments[i](env), new_environment);
+    }
+    return analyze_sequence(procedure.code)(new_environment);
+  };
 }
 
-function eval_sequence(sequence_of_expressionTrees, env) {
+function analyze_sequence(sequence_of_expressionTrees) {
   "use strict";
-  if (sequence_of_expressionTrees.length === 1) {
-    return evaluate(sequence_of_expressionTrees[0], env);
+  // first, analyze all the expressionTrees
+  var analyzed_expressions = [];
+  for (var i = 0; i < sequence_of_expressionTrees.length; i++) {
+    analyzed_expressions.push(analyze(sequence_of_expressionTrees[i]));
   }
-  evaluate(sequence_of_expressionTrees[0], env);
-  return eval_sequence(sequence_of_expressionTrees.slice(1), env);
+  return function(env) {
+    var value_to_return;
+    for (var i = 0; i < analyzed_expressions.length; i++) {
+      value_to_return = analyzed_expressions[i](env);
+    }
+    return value_to_return;
+  };
 }
 
-
-function eval_if(expressionTree, env) {
+function analyze_if(expressionTree) {
   "use strict";
-  // expressionTree should look like this...
-  // (3 1 4)
-  if (evaluate(expressionTree[0], env)) {
-    return evaluate(expressionTree[1], env);
-  } else if (expressionTree.length === 3) {
-    return evaluate(expressionTree[2], env);
-  } else {
-    return false;
+  var predicate = analyze(expressionTree[1]);
+  var evaluate_on_true = analyze(expressionTree[2]);
+  switch (expressionTree.length) {
+    case 3: // expressionTree looks like this: (if 3 1)
+      return function(env) {
+        if (predicate(env)) {
+          return evaluate_on_true(env);
+        } else {
+          return false;
+        }
+      };
+    case 4: // expressionTree looks like this: (if 3 1 2)
+      var evaluate_on_false = analyze(expressionTree[3]);
+      return function(env) {
+        if (predicate(env)) {
+          return evaluate_on_true(env);
+        } else {
+          return evaluate_on_false(env);
+        }
+      };
+    default:
+      throw "if -expressions must have a length of 3 or 4";
   }
 }
 
-function eval_define(expressionTree, env) {
+function analyze_define(expressionTree) {
   "use strict";
+  var value;
   // expressionTree should look like this...
   // (define variable_name variable_value)
   if (typeof expressionTree[1] !== "object") {
@@ -170,8 +251,11 @@ function eval_define(expressionTree, env) {
     if (expressionTree.length !== 3) {
       throw "there should be a single expression after an identifier in a define";
     }
-    define_variable(expressionTree[1],
-      evaluate(expressionTree[2], env), env);
+    value = analyze(expressionTree[2]);
+    return function(env) {
+      define_variable(expressionTree[1],
+        value(env), env);
+    };
   } else {
     // or this...
     // (define (function_name param1 param2) (* 2 x))
@@ -182,17 +266,19 @@ function eval_define(expressionTree, env) {
     var lamb = ["lambda"];
     lamb.push(expressionTree[1].slice(1));
     lamb = lamb.concat(expressionTree.slice(2));
-    define_variable(expressionTree[1][0],
-      evaluate(lamb, env), env);
+    value = analyze(lamb);
+    return function(env) {
+      define_variable(expressionTree[1][0],
+        value(env), env);
+    };
   }
 }
-
 
 // a procedure should look like this. it should be an object
 // procedure.parameters = [x, y, z, etc];
 // procedure.code = an array of expressionTrees
 // procedure.env points to the parent_frame
-function eval_lambda(expressionTree, env) {
+function analyze_lambda(expressionTree) {
   "use strict";
   // expression Tree should look like this...
   // (lambda (x y) (* x y))
@@ -201,8 +287,10 @@ function eval_lambda(expressionTree, env) {
   var procedure = {};
   procedure.parameters = expressionTree[1];
   procedure.code = expressionTree.slice(2);
-  procedure.env = env;
-  return procedure;
+  return function(env) {
+    procedure.env = env;
+    return procedure;
+  };
 }
 
 // x is a procedure if it is an object with
@@ -215,7 +303,6 @@ function is_procedure(x) {
   }
   return true;
 }
-
 
 /*
  * Our environment structure is like so...
@@ -247,7 +334,7 @@ function set_variable_value(variable, val, env) {
   if (typeof env.bindings[variable] !== "undefined") {
     env.bindings[variable] = val;
   } else if (typeof env.parent_frame === "undefined") {
-    throw "variable can't be found!";
+    throw "variable can 't be found!";
   } else {
     set_variable_value(variable, val, env.parent_frame);
   }

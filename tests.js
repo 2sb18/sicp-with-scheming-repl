@@ -50,6 +50,12 @@ test("expressionToTree", function() {
     "input \"   (lambda(x)x)\" should return [\"lambda\", [\"x\"], \"x\"]. Spaces at the start shouldn't matter");
 });
 
+test("evaluating primitive types", function() {
+  var env = empty_environment();
+  equal(qeval("3", env), 3, "3 evaluates to 3", env);
+});
+
+
 test("eval-if", function() {
   var env = empty_environment();
   equal(qeval("(if true 1 0)", env), 1,
@@ -85,7 +91,7 @@ test("environment-stuff", function() {
     "set_variable_value correctly overwrites old values");
 });
 
-test("primitives", function() {
+test("evaluating primitive functions", function() {
   var env = empty_environment();
   equal(qeval("(* 3 6)", env), 18,
     "evaluating (* 3 6) results in 18");
@@ -105,7 +111,7 @@ test("lambdas", function() {
     ["*", "x", "3"],
     ["+", "1", "2"]
   ];
-  var lambda_procedure = eval_lambda(lambda_exp, env);
+  var lambda_procedure = evaluate(lambda_exp, env);
   deepEqual(lambda_procedure.code, [
       ["*", "x", "3"],
       ["+", "1", "2"]
