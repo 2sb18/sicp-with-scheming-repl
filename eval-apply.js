@@ -70,6 +70,8 @@ function analyze(expressionTree) {
   switch (expressionTree[0]) {
     case "if":
       return analyze_if(expressionTree);
+    case "cond":
+      return analyze_cond(expressionTree);
     case "define":
       return analyze_define(expressionTree);
     case "lambda":
@@ -233,8 +235,33 @@ function analyze_if(expressionTree) {
         }
       };
     default:
-      throw "if -expressions must have a length of 3 or 4";
+      throw "if expressions must have a length of 3 or 4";
   }
+}
+
+function analyze_cond(expressionTree) {
+  "use strict";
+  var analyzed_conditions = [];
+  var analyzed_executions = [];
+  // analyze the conditions and executions
+  for (var i = 1; i < expressionTree.length; i++) {
+    var condition_to_analyze = expressionTree[i][0];
+    if (condition_to_analyze === "else") {
+      condition_to_analyze = "true";
+    }
+    analyzed_conditions.push(analyze(condition_to_analyze));
+
+    var execution_to_analyze = expressionTree[i][1];
+    analyzed_executions.push(analyze(execution_to_analyze));
+  }
+
+  return function(env) {
+    for (var i = 0; i < analyzed_conditions.length; i++) {
+      if (analyzed_conditions[i](env)) {
+        return analyzed_executions[i](env);
+      }
+    }
+  };
 }
 
 function analyze_define(expressionTree) {

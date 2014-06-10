@@ -1,7 +1,7 @@
 /* global test, equal, deepEqual, throws */
 /* global convertTreeObjIntoTreeArray, expressionToTree, qeval */
 /* global extend_environment, define_variable, lookup_variable_value, empty_environment */
-/* global eval_lambda */
+/* global evaluate */
 /* global set_variable_value */
 /* jshint globalstrict:true */
 //
@@ -56,7 +56,7 @@ test("evaluating primitive types", function() {
 });
 
 
-test("eval-if", function() {
+test("test if statements", function() {
   var env = empty_environment();
   equal(qeval("(if true 1 0)", env), 1,
     "(if true 1 0) evaluates to 1");
@@ -161,4 +161,10 @@ test("y operator", function() {
   var env = empty_environment();
   equal(qeval("((lambda (n) ((lambda (fact) (fact fact n)) (lambda (ft k) (if (= k 1) 1 (* k (ft ft (- k 1))))))) 4)", env), 24,
     "the y operator can be used to calculate factorials");
+});
+
+test("test cond statements", function() {
+  var env = empty_environment();
+  equal(qeval("(cond ((= 1 3) 5))", env), undefined, "(cond ((= 1 3) 5)) evaluates to false");
+  equal(qeval("(cond ((= 1 0) 3) ((= 1 0) 4) (else 5))", env), 5, "can use else as a catch all");
 });
