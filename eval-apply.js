@@ -72,6 +72,8 @@ function analyze(expressionTree) {
       return analyze_if(expressionTree);
     case "cond":
       return analyze_cond(expressionTree);
+    case "let":
+      return analyze_let(expressionTree);
     case "define":
       return analyze_define(expressionTree);
     case "lambda":
@@ -263,6 +265,30 @@ function analyze_cond(expressionTree) {
     }
   };
 }
+
+function analyze_let(expressionTree) {
+  "use strict";
+  // let's take our let expression and turn it into 
+  // a call on an anonymous procedure
+  // ie. (let ((a 3) (b 4)) (* a b))
+  // becomes ((lambda (a b) (* a b)) 3 4)
+  //
+  var parameter_list = [];
+  var argument_list = [];
+  for (var i = 0; i < expressionTree[1].length; i++) {
+    parameter_list.push(expressionTree[1][i][0]);
+    argument_list.push(expressionTree[1][i][1]);
+  }
+  var code = expressionTree.slice(2);
+  var lamb = ["lambda"];
+  lamb.push(parameter_list);
+  lamb = lamb.concat(code);
+
+  var whole_expression = [lamb].concat(argument_list);
+  return analyze(whole_expression);
+}
+
+
 
 function analyze_define(expressionTree) {
   "use strict";

@@ -168,3 +168,9 @@ test("test cond statements", function() {
   equal(qeval("(cond ((= 1 3) 5))", env), undefined, "(cond ((= 1 3) 5)) evaluates to false");
   equal(qeval("(cond ((= 1 0) 3) ((= 1 0) 4) (else 5))", env), 5, "can use else as a catch all");
 });
+
+test("test let statements", function() {
+  var env = empty_environment();
+  equal(qeval("(let ((a 3) (b 4)) (* a b))", env), 12,
+    "(let ((a 3) (b 4)) (* a b)) evaluates to 12");
+});
