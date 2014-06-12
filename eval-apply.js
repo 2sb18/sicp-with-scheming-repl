@@ -1,4 +1,4 @@
-/* exported evaluate, qeval,  */
+/* exported evaluate, qeval, teval */
 // environment stuff
 /* exported set_variable_value, lookup_variable_value, extend_environment */
 /* exported define_variable, empty_environment */
@@ -111,6 +111,15 @@ function qeval(expression, env) {
   }
 }
 
+// timing a qeval
+function teval(expression, env) {
+  "use strict";
+  console.time("timing");
+  var thing_to_return = qeval(expression, env);
+  console.timeEnd("timing");
+  return thing_to_return;
+}
+
 function analyze_mult(expressionTree) {
   "use strict";
   // expressionTree looks like (* 3 4)
@@ -205,13 +214,22 @@ function analyze_sequence(sequence_of_expressionTrees) {
   for (var i = 0; i < sequence_of_expressionTrees.length; i++) {
     analyzed_expressions.push(analyze(sequence_of_expressionTrees[i]));
   }
-  return function(env) {
-    var value_to_return;
-    for (var i = 0; i < analyzed_expressions.length; i++) {
-      value_to_return = analyzed_expressions[i](env);
+
+  function sequentially(exp1, exp2) {
+    return function(env) {
+      exp1(env);
+      return exp2(env);
+    };
+  }
+
+  function loop(first_exp, rest_of_exps) {
+    if (rest_of_exps.length === 0) {
+      return first_exp;
     }
-    return value_to_return;
-  };
+    return loop(sequentially(first_exp, rest_of_exps[0]), rest_of_exps.slice(1));
+  }
+  var thing_to_return = loop(analyzed_expressions[0], analyzed_expressions.slice(1));
+  return thing_to_return;
 }
 
 function analyze_if(expressionTree) {

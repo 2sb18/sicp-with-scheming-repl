@@ -1,5 +1,5 @@
 /* global test, equal, deepEqual, throws */
-/* global convertTreeObjIntoTreeArray, expressionToTree, qeval */
+/* global convertTreeObjIntoTreeArray, expressionToTree, qeval, teval */
 /* global extend_environment, define_variable, lookup_variable_value, empty_environment */
 /* global evaluate */
 /* global set_variable_value */
@@ -174,3 +174,4 @@ test("test let statements", function() {
   equal(qeval("(let ((a 3) (b 4)) (* a b))", env), 12,
     "(let ((a 3) (b 4)) (* a b)) evaluates to 12");
 });
+
