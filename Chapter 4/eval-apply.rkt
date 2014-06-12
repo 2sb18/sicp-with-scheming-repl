@@ -11,7 +11,6 @@
  while->if
  get-vars-of-var-expression-list
  get-exprs-of-var-expression-list
- let->combination
  let*->nested-lets
  tagged-list?
  definition-variable
@@ -49,7 +48,8 @@
 ; the our-eval procedure takes an expression and the environment that it's to be
 ; executed in
 (define (our-eval exp env)
-  ((analyze exp) env))
+  (let ((analyzed-exp (analyze exp))) ; I put in this let so we can see what the analyzed-exp looks like
+    (analyzed-exp env)))
 
 ; analyze has to return a procedure that takes an environment variable
 ; as an argument
@@ -68,7 +68,7 @@
     ((tagged-list? exp 'make-unbound!) 
      (let ((variable-name (cadr exp)))
        (lambda (env) (unbind! variable-name env))))
-    ((tagged-list? exp 'let) (analyze (let->combination exp)))
+    ((tagged-list? exp 'let) (analyze-let exp))
     ((tagged-list? exp 'let*) (analyze (let*->nested-lets exp)))
     ((tagged-list? exp 'letrec) (analyze (let-and-set (cadr exp) (cddr exp))))
     ((tagged-list? exp 'if) (analyze-if exp))
@@ -218,10 +218,49 @@
 ; the exp is a list, (let var-exp-list body)
 ;                  = (let ((a 3) (b 4)) body)
 ; lets get turned into a application of a lambda
-(define (let->combination exp)
-  (cons (make-lambda (get-vars-of-var-expression-list (cadr exp))
-                     (cddr exp))
-        (get-exprs-of-var-expression-list (cadr exp))))
+;
+; analyze-let should return (lambda (env) ...)
+; (define (analyze-let exp)
+; one constraint we have is that vars can't be expressions
+; (let ((vars (get-vars-of-var-expression-list (cadr exp)))
+;       ; remember, these are (lambda (env) ...)
+;       (analyzed-exprs (map analyze (get-exprs-of-var-expression-list (cadr exp))))
+;       (analyzed-body (analyze (cddr exp))))
+; (lambda (env)
+;   (cons (make-lambda (get-vars-of-var-expression-list (cadr exp))
+;                      (cddr exp))
+;         (get-exprs-of-var-expression-list (cadr exp)))))
+
+;       (cons (make-lambda vars (analyzed-body env))
+;             ; maybe ephiphany? ENVIRONMENT IS WHERE YOU GET THE DEFINITION
+;             ; FOR VARIABLES!!!
+;             (
+;             (map (lambda (expr) (expr env)) analyzed-exprs) ))))
+;
+;
+; (define (let->combination exp)
+;   (cons (make-lambda (get-vars-of-var-expression-list (cadr exp))
+;                      (cddr exp))
+;         (get-exprs-of-var-expression-list (cadr exp))))
+
+(define (analyze-let exp)
+  (let ((vars (get-vars-of-var-expression-list (cadr exp)))
+        (analyze-exprs (map analyze (get-exprs-of-var-expression-list (cadr exp))))
+        (analyzed-body (analyze (cddr exp))))
+    (lambda (env)
+      (cons (make-lambda
+              vars
+              (analyzed-body env))
+            (map (lambda (function) (apply function (list env)))
+                 analyze-exprs)))))
+
+; ((lambda vars
+;    (analyzed-body env
+
+; (cons (make-lambda (get-vars-of-var-expression-list (cadr exp))
+;                    (cddr exp))
+;       (get-exprs-of-var-expression-list (cadr exp))))
+
 
 (define (let*->nested-lets exp)
   ; if there's only one var-expression pair left, just turn the let* into a
@@ -542,4 +581,6 @@
                     (caddr object))))
         ((pair? object) (plp object))
         (else (display object))))
+
+(driver-loop)
 

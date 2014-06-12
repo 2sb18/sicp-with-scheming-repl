@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>THE SCHEMING REPL!</title>
+  <script src="eval-apply.js"></script>
+  <script src="jquery-2.1.0.min.js"></script>
+</head>
+
+<body style="font-family:courier;font-weight:bold; background-color:black; color:crimson">
+  <div id="output"></div>
+  <p id="input"></p>
+
+  <script>
+    function addParagraphToOutput(string) {
+      $("#output").append("<p>" + string + "</p>");
+    }
+
+    function convertToHTMLCode(string) {
+      var stringToReturn = "";
+      for (var i = 0; i < string.length; i++) {
+        switch (string[i]) {
+          case " ":
+            stringToReturn += "&nbsp";
+            break;
+          case "\n":
+            stringToReturn += "<br />";
+            break;
+          default:
+            stringToReturn += string[i];
+        }
+      }
+      return stringToReturn;
+    }
+
+
+    window.setInterval(blink, 500);
+
+    var currentLine = "";
+    var blink_state = 0;
+
+    function updateCurrentLine() {
+      var blinker = "";
+      if (blink_state) {
+        blinker = "&#9608;";
+      }
+      $("#input").html("> " + convertToHTMLCode(currentLine) + blinker);
+    }
+
+    $(document).keypress(function(e) {
+      if (e.charCode === 13) { // enter
+        addParagraphToOutput("> " + convertToHTMLCode(currentLine));
+        try {
+          addParagraphToOutput(convertToHTMLCode(qeval(currentLine)));
+        } catch (e) {
+          addParagraphToOutput(convertToHTMLCode(e.message));
+        }
+        currentLine = "";
+        updateCurrentLine();
+      } else if (e.charCode === 10) { // ctrl-enter
+        currentLine += "\n";
+      } else {
+        currentLine += String.fromCharCode(e.charCode);
+        updateCurrentLine();
+      }
+    });
+
+    $(document).keyup(function(e) {
+      if (e.keyCode === 8) { // backspace
+        currentLine = currentLine.slice(0, -1);
+        updateCurrentLine();
+      }
+    });
+
+    function blink() {
+      blink_state ^= 1;
+      updateCurrentLine();
+    }
+
+    updateCurrentLine();
+  </script>
+
+
+
+</body>
+
+
+</html>
