@@ -1,5 +1,5 @@
 /* global test, equal, deepEqual, throws */
-/* global convertTreeObjIntoTreeArray, expressionToTree, qeval, teval */
+/* global convertTreeObjIntoTreeArray, expressionToTree, qeval */
 /* global extend_environment, define_variable, lookup_variable_value, empty_environment */
 /* global evaluate */
 /* global set_variable_value */
@@ -175,3 +175,8 @@ test("test let statements", function() {
     "(let ((a 3) (b 4)) (* a b)) evaluates to 12");
 });
 
+test("test unless statements", function() {
+  var env = empty_environment();
+  qeval("(define (factorial n) (unless (= n 1) (* n (factorial (- n 1))) 1))", env);
+  equal(qeval("(factorial 5)", env), 120, "unless statements work");
+});

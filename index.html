@@ -58,7 +58,13 @@
     $(document).keypress(function(e) {
       if (e.charCode === 13) { // enter
         addParagraphToOutput("> " + convertToHTMLCode(currentLine));
-        addParagraphToOutput(convertToHTMLCode(qeval(currentLine, global_env)));
+        var result;
+        try {
+          result = qeval(currentLine, global_env);
+        } catch (err) {
+          result = err;
+        }
+        addParagraphToOutput(convertToHTMLCode(result));
         currentLine = "";
         updateCurrentLine();
       } else if (e.charCode === 10) { // ctrl-enter
@@ -69,8 +75,9 @@
       }
     });
 
-    $(document).keyup(function(e) {
+    $(document).keydown(function(e) {
       if (e.keyCode === 8) { // backspace
+        e.preventDefault();
         currentLine = currentLine.slice(0, -1);
         updateCurrentLine();
       }

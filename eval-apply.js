@@ -78,6 +78,8 @@ function analyze(expressionTree) {
       return analyze_define(expressionTree);
     case "lambda":
       return analyze_lambda(expressionTree);
+    case "unless":
+      return analyze_unless(expressionTree);
 
       // primitives
     case "*":
@@ -136,7 +138,11 @@ function analyze_div(expressionTree) {
   var first = analyze(expressionTree[1]);
   var second = analyze(expressionTree[2]);
   return function(env) {
-    return first(env) / second(env);
+    var second_result = second(env);
+    if (second_result === 0) {
+      throw "divide by 0 error";
+    }
+    return first(env) / second_result;
   };
 }
 
@@ -259,6 +265,23 @@ function analyze_if(expressionTree) {
   }
 }
 
+function analyze_unless(expressionTree) {
+  "use strict";
+  // expressionTree should look like this...
+  // (unless condition usual-value exceptional-value)
+  var predicate = analyze(expressionTree[1]);
+  var usual = analyze(expressionTree[2]);
+  var exception = analyze(expressionTree[3]);
+  return function(env) {
+    if (predicate(env)) {
+      return exception(env);
+    } else {
+      return usual(env);
+    }
+  };
+}
+
+
 function analyze_cond(expressionTree) {
   "use strict";
   var analyzed_conditions = [];
@@ -363,6 +386,8 @@ function analyze_lambda(expressionTree) {
     return procedure;
   };
 }
+
+
 
 // x is a procedure if it is an object with
 // parameters, code, and env members
